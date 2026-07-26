@@ -1,19 +1,27 @@
-using System.Net.Http.Json;
+using System.Net.Http.Headers;
 using System.Text.Json;
 
 namespace AnimeWidgetDesktop;
 
 public sealed class FeedService
 {
-    private readonly HttpClient _httpClient = new()
-    {
-        Timeout = TimeSpan.FromSeconds(10)
-    };
+    private static readonly HttpClient Http = CreateClient();
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNameCaseInsensitive = true
     };
+
+    private static HttpClient CreateClient()
+    {
+        var client = new HttpClient
+        {
+            Timeout = TimeSpan.FromSeconds(12)
+        };
+        client.DefaultRequestHeaders.UserAgent.Add(new ProductInfoHeaderValue("AnimeFollowingWidget", "1.1"));
+        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        return client;
+    }
 
     public async Task<AnimeFeed> LoadAsync(string? source, CancellationToken cancellationToken = default)
     {
@@ -26,21 +34,25 @@ public sealed class FeedService
         {
             if (Uri.TryCreate(source, UriKind.Absolute, out var uri) && (uri.Scheme is "http" or "https"))
             {
-                using var response = await _httpClient.GetAsync(uri, cancellationToken);
+                using var response = await Http.GetAsync(uri, cancellationToken).ConfigureAwait(false);
                 response.EnsureSuccessStatusCode();
-                var json = await response.Content.ReadAsStringAsync(cancellationToken);
+                var json = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
                 return Parse(json);
             }
 
             if (File.Exists(source))
             {
-                var json = await File.ReadAllTextAsync(source, cancellationToken);
+                var json = await File.ReadAllTextAsync(source, cancellationToken).ConfigureAwait(false);
                 return Parse(json);
             }
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
-            // Fall back to demo feed.
+            // Fall through to demo feed.
         }
 
         return BuildDemoFeed();
@@ -58,12 +70,13 @@ public sealed class FeedService
         }
         catch
         {
+            // ignore parse errors
         }
 
         return BuildDemoFeed();
     }
 
-    private static AnimeFeed BuildDemoFeed() => new()
+    public static AnimeFeed BuildDemoFeed() => new()
     {
         Title = "本周放送列表",
         UpdatedAt = DateTimeOffset.Now,
