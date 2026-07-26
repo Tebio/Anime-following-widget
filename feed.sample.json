@@ -2,16 +2,57 @@
   "title": "本周放送列表",
   "updatedAt": "2026-07-26T17:00:00+08:00",
   "items": [
-    { "title": "Grow Up Show ～向日葵马戏团～", "badge": "New", "time": "23:00", "episode": "第04集", "platform": "B站", "watchUrl": "https://www.bilibili.com/" },
-    { "title": "黄泉使者", "badge": "New", "time": "00:00", "episode": "第16集", "platform": "B站", "watchUrl": "https://www.bilibili.com/" },
-    { "title": "穹庐下的魔女", "badge": "New", "time": "22:30", "episode": "第05集", "platform": "B站", "watchUrl": "https://www.bilibili.com/" },
-    { "title": "人造人009 涅墨西斯", "badge": "完结", "time": "—", "episode": "完结", "platform": "番剧库", "watchUrl": "https://www.bilibili.com/" },
-    { "title": "声称不爱我的下任公爵为何会泪流…", "badge": "New", "time": "00:30", "episode": "第04集", "platform": "B站", "watchUrl": "https://www.bilibili.com/" },
-    { "title": "魔法少女奈叶 EXCEEDS Gun Blaze V…", "badge": "New", "time": "00:00", "episode": "第04集", "platform": "B站", "watchUrl": "https://www.bilibili.com/" },
-    { "title": "一叠间漫画咖啡屋生活！", "badge": "完结", "time": "—", "episode": "完结", "platform": "番剧库", "watchUrl": "https://www.bilibili.com/" },
-    { "title": "花织同学转生后还是想干架", "badge": "New", "time": "01:30", "episode": "第03集", "platform": "B站", "watchUrl": "https://www.bilibili.com/" },
-    { "title": "鬼之花嫁", "badge": "New", "time": "23:30", "episode": "第04集", "platform": "B站", "watchUrl": "https://www.bilibili.com/" },
-    { "title": "才女的侍从 在满是高岭之花的贵族…", "badge": "New", "time": "01:38", "episode": "第04集", "platform": "B站", "watchUrl": "https://www.bilibili.com/" },
-    { "title": "炒翻天", "badge": "New", "time": "16:30", "episode": "第03集", "platform": "B站", "watchUrl": "https://www.bilibili.com/" }
+    {
+      "title": "凡人修仙传",
+      "badge": "New",
+      "time": "23:00",
+      "episode": "第184集",
+      "latestEpisode": 184,
+      "platform": "B站",
+      "watchUrl": "https://www.agedm.io/play/20200283/1/184",
+      "animeId": "20200283",
+      "seasonNumber": 1,
+      "updateWeekday": 0,
+      "notes": "原力动画制作，每周日更新"
+    },
+    {
+      "title": "咒术回战",
+      "badge": "",
+      "time": "22:30",
+      "episode": "第24集",
+      "latestEpisode": 24,
+      "platform": "腾讯视频",
+      "watchUrl": "https://www.agedm.io/play/20190123/2/24",
+      "animeId": "20190123",
+      "seasonNumber": 2,
+      "updateWeekday": 5,
+      "notes": "第二季，每周五更新"
+    },
+    {
+      "title": "间谍过家家",
+      "badge": "Hot",
+      "time": "21:00",
+      "episode": "第36集",
+      "latestEpisode": 36,
+      "platform": "爱奇艺",
+      "watchUrl": "https://www.agedm.io/play/20220187/1/36",
+      "animeId": "20220187",
+      "seasonNumber": 1,
+      "updateWeekday": 6,
+      "notes": "每周六更新"
+    },
+    {
+      "title": "鬼灭之刃",
+      "badge": "Classic",
+      "time": "20:00",
+      "episode": "第44集",
+      "latestEpisode": 44,
+      "platform": "优酷",
+      "watchUrl": "https://www.agedm.io/play/20190101/1/44",
+      "animeId": "20190101",
+      "seasonNumber": 1,
+      "updateWeekday": 1,
+      "notes": "经典之作，每周一更新"
+    }
   ]
 }
