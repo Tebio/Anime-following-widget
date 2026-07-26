@@ -429,16 +429,20 @@ public sealed class MainForm : Form
             control.BackColor = control == _header || control == _content ? back : control.BackColor;
         }
 
-        foreach (Control button in _header.Controls.OfType<FlowLayoutPanel>().FirstOrDefault()?.Controls ?? [] )
+        var headerButtons = _header.Controls.OfType<FlowLayoutPanel>().FirstOrDefault();
+        if (headerButtons is not null)
         {
-            button.BackColor = panel;
-            button.ForeColor = text;
+            foreach (Control button in headerButtons.Controls)
+            {
+                button.BackColor = panel;
+                button.ForeColor = text;
+            }
         }
 
         _listPanel.BackColor = back;
         _opacityTrack.BackColor = back;
 
-        foreach (Control group in _content.Controls.OfType<Panel>().Take(1))
+        foreach (Control group in _content.Controls.OfType<Panel>())
         {
             group.BackColor = back;
         }
@@ -476,7 +480,6 @@ public sealed class MainForm : Form
         _opacityTrack.Value = Math.Clamp(_settings.OpacityPercent, 55, 100);
         _autoRefreshTimer.Interval = Math.Max(1, _settings.RefreshMinutes) * 60 * 1000;
         Invalidate(true);
-        ApplyTheme();
     }
 
     private void SaveWindowBounds()
