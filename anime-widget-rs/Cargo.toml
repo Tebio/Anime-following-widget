@@ -1,6 +1,6 @@
 [package]
 name = "anime-widget"
-version = "1.2.0"
+version = "1.3.0"
 edition = "2021"
 description = "Windows 追番桌面小组件（单文件免安装）"
 license = "MIT"
