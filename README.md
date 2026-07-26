@@ -1,73 +1,36 @@
 # Anime-following-widget
 
-一个 Windows 桌面番剧更新卡片小组件。
+Windows 桌面追番小组件。**当前主实现为 Rust**（`anime-widget-rs/`），单文件 EXE、免安装。
+
+原 C# 版保留在 `AnimeWidgetDesktop/`（可继续用 Actions 的 `build-windows` 打包）。
 
 ## 功能
 
-- 无边框圆角卡片、可拖动、半透明
-- 始终置顶 / 主题切换（深色 / 浅色）
-- 强调色切换（紫 / 青 / 绿 / 粉 / 橙）
-- 点击番剧条目直接打开播放链接
-- 自动从 JSON 更新源拉取最新列表（支持 HTTP(S) 与本地文件）
-- 窗口位置 / 大小 / 透明度自动记忆
-- 右上角关闭按钮
+- 无边框圆角卡片、可拖动、半透明、始终置顶
+- 深色 / 浅色主题 + 强调色（紫 / 青 / 绿 / 粉 / 橙）
+- 点击条目打开播放页（优先 AgeDM：`/play/{id}/{season}/{ep}`，否则 `watchUrl`）
+- 「今日更新」动态提示（按 `updateWeekday`）
+- JSON 数据源：HTTP(S) / 本地文件 / 内置示例
+- 设置持久化到 `%AppData%\\AnimeFollowingWidget\\settings.json`
 
-## 下载（单文件 / 免安装）
+## 下载（Rust 单文件）
 
-构建产物是 **单文件自包含 EXE**：内嵌 .NET 运行时，**无需安装 .NET**，下载后双击即可运行。
+1. [Actions → build-rust-windows](https://github.com/Tebio/Anime-following-widget/actions/workflows/build-rust-windows.yml) 下载 Artifact `AnimeWidget-rust-win-x64`
+2. 或 [Releases](https://github.com/Tebio/Anime-following-widget/releases) 中的 `AnimeWidget-win-x64.exe`
 
-### 方式一：Releases（推荐）
+发版：Actions → **build-rust-windows** → Run workflow → 勾选 `create_release`，tag 如 `v1.2.0`。
 
-打开 [Releases](https://github.com/Tebio/Anime-following-widget/releases) ，下载：
+## 本地编译（Rust）
 
-- `AnimeWidgetDesktop-win-x64.exe` — 单文件可执行程序
-- 或 `AnimeWidgetDesktop-win-x64-singlefile.zip` — 同上的压缩包
-
-### 方式二：Actions Artifact
-
-1. 打开 [Actions](https://github.com/Tebio/Anime-following-widget/actions)
-2. 选最新成功的 **build-windows**
-3. 下载 Artifact：`AnimeWidgetDesktop-win-x64-singlefile`
-
-### 发布新版本到 Releases
-
-**手动触发（推荐）：**
-
-1. Actions → **build-windows** → **Run workflow**
-2. 勾选 `create_release`
-3. `release_tag` 填例如 `v1.1.0`
-4. 运行完成后到 [Releases](https://github.com/Tebio/Anime-following-widget/releases) 查看
-
-**或推送 tag：**
-
-```bash
-git tag v1.1.0
-git push origin v1.1.0
-```
-
-推送 `v*` tag 后会自动构建并创建 GitHub Release，附带单文件 EXE。
-
-### 本地打包
-
-需安装 .NET 8 SDK：
+需安装 [Rust](https://rustup.rs/)：
 
 ```powershell
-cd AnimeWidgetDesktop
-dotnet publish -c Release -r win-x64 --self-contained true `
-  /p:PublishSingleFile=true `
-  /p:EnableCompressionInSingleFile=true `
-  /p:IncludeNativeLibrariesForSelfExtract=true
+cd anime-widget-rs
+cargo build --release
+# 产物：target\\release\\anime-widget.exe
 ```
 
-生成目录：`bin\Release\net8.0-windows\win-x64\publish\`
-
-## 项目结构
-
-- `AnimeWidgetDesktop/` ：Windows 桌面程序源码（.NET 8 WinForms）
-- `feed.sample.json` ：示例更新源
-- `.github/workflows/build-windows.yml` ：单文件 EXE 打包 + Release 工作流
-
-## 更新源格式
+## 数据格式
 
 ```json
 {
@@ -75,22 +38,33 @@ dotnet publish -c Release -r win-x64 --self-contained true `
   "updatedAt": "2026-07-26T17:00:00+08:00",
   "items": [
     {
-      "title": "番剧名称",
+      "title": "凡人修仙传",
       "badge": "New",
       "time": "23:00",
-      "episode": "第04集",
+      "episode": "第184集",
+      "latestEpisode": 184,
       "platform": "B站",
-      "watchUrl": "https://example.com",
-      "notes": "可选备注"
+      "watchUrl": "https://www.agedm.io/play/20200283/1/184",
+      "animeId": "20200283",
+      "seasonNumber": 1,
+      "updateWeekday": 0,
+      "notes": "每周日更新"
     }
   ]
 }
 ```
 
-程序默认读取仓库 `feed.sample.json`。可在设置里改成自己的 API / 本地 JSON；留空用内置示例。
+- `updateWeekday`：0=周日 … 6=周六
+- 有 `animeId` 时按 AgeDM 模板打开；否则用 `watchUrl`
 
-设置文件：`%AppData%\AnimeFollowingWidget\settings.json`
+## 目录
+
+| 路径 | 说明 |
+|------|------|
+| `anime-widget-rs/` | **Rust 主程序**（eframe/egui） |
+| `AnimeWidgetDesktop/` | 旧 C# WinForms 版 |
+| `feed.sample.json` / `anime-widget-rs/feed.sample.json` | 示例源 |
 
 ## 版本
 
-当前 **1.1.0**（单文件免安装、UI 优化、关闭按钮、强调色条、圆角等）。
+**1.2.0** — Rust 重写：AgeDM 链接、今日更新、单文件发布。
