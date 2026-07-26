@@ -20,7 +20,7 @@ public sealed class MainForm : Form
     private readonly TrackBar _opacityTrack = new();
     private readonly FlowLayoutPanel _accentPanel = new();
     private readonly FlowLayoutPanel _headerButtons = new();
-    private readonly Timer _autoRefreshTimer = new();
+    private readonly System.Windows.Forms.Timer _autoRefreshTimer = new();
     private readonly Button _closeButton = new();
 
     private readonly Color _darkBack = Color.FromArgb(16, 18, 27);
