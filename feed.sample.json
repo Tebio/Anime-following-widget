@@ -1,0 +1,17 @@
+{
+  "title": "本周放送列表",
+  "updatedAt": "2026-07-26T17:00:00+08:00",
+  "items": [
+    { "title": "Grow Up Show ～向日葵马戏团～", "badge": "New", "time": "23:00", "episode": "第04集", "platform": "B站", "watchUrl": "https://www.bilibili.com/" },
+    { "title": "黄泉使者", "badge": "New", "time": "00:00", "episode": "第16集", "platform": "B站", "watchUrl": "https://www.bilibili.com/" },
+    { "title": "穹庐下的魔女", "badge": "New", "time": "22:30", "episode": "第05集", "platform": "B站", "watchUrl": "https://www.bilibili.com/" },
+    { "title": "人造人009 涅墨西斯", "badge": "完结", "time": "—", "episode": "完结", "platform": "番剧库", "watchUrl": "https://www.bilibili.com/" },
+    { "title": "声称不爱我的下任公爵为何会泪流…", "badge": "New", "time": "00:30", "episode": "第04集", "platform": "B站", "watchUrl": "https://www.bilibili.com/" },
+    { "title": "魔法少女奈叶 EXCEEDS Gun Blaze V…", "badge": "New", "time": "00:00", "episode": "第04集", "platform": "B站", "watchUrl": "https://www.bilibili.com/" },
+    { "title": "一叠间漫画咖啡屋生活！", "badge": "完结", "time": "—", "episode": "完结", "platform": "番剧库", "watchUrl": "https://www.bilibili.com/" },
+    { "title": "花织同学转生后还是想干架", "badge": "New", "time": "01:30", "episode": "第03集", "platform": "B站", "watchUrl": "https://www.bilibili.com/" },
+    { "title": "鬼之花嫁", "badge": "New", "time": "23:30", "episode": "第04集", "platform": "B站", "watchUrl": "https://www.bilibili.com/" },
+    { "title": "才女的侍从 在满是高岭之花的贵族…", "badge": "New", "time": "01:38", "episode": "第04集", "platform": "B站", "watchUrl": "https://www.bilibili.com/" },
+    { "title": "炒翻天", "badge": "New", "time": "16:30", "episode": "第03集", "platform": "B站", "watchUrl": "https://www.bilibili.com/" }
+  ]
+}
