@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Drawing.Drawing2D;
 using System.Runtime.InteropServices;
 
 namespace AnimeWidgetDesktop;
@@ -17,16 +18,15 @@ public sealed class MainForm : Form
     private readonly Label _updatedLabel = new();
     private readonly Label _statusLabel = new();
     private readonly TrackBar _opacityTrack = new();
-    private readonly Button _refreshButton = new();
-    private readonly Button _themeButton = new();
-    private readonly Button _settingsButton = new();
     private readonly FlowLayoutPanel _accentPanel = new();
+    private readonly FlowLayoutPanel _headerButtons = new();
     private readonly Timer _autoRefreshTimer = new();
+    private readonly Button _closeButton = new();
 
     private readonly Color _darkBack = Color.FromArgb(16, 18, 27);
     private readonly Color _lightBack = Color.FromArgb(245, 247, 250);
-    private readonly Color _darkPanel = Color.FromArgb(255, 255, 255, 18);
-    private readonly Color _lightPanel = Color.FromArgb(20, 25, 40, 10);
+    private readonly Color _darkPanel = Color.FromArgb(28, 32, 48);
+    private readonly Color _lightPanel = Color.FromArgb(255, 255, 255);
 
     public MainForm()
     {
@@ -38,34 +38,72 @@ public sealed class MainForm : Form
         BackColor = _darkBack;
         ForeColor = Color.White;
         Font = new Font("Segoe UI", 9.5f);
-        MinimumSize = new Size(360, 540);
+        MinimumSize = new Size(360, 520);
         ClientSize = new Size(_settings.WindowWidth, _settings.WindowHeight);
         Location = new Point(_settings.WindowX, _settings.WindowY);
         TopMost = _settings.AlwaysOnTop;
         DoubleBuffered = true;
+        ShowInTaskbar = true;
 
         BuildUi();
         ApplyTheme();
         ApplyVisualSettings();
+        ApplyRoundedCorners();
 
         _autoRefreshTimer.Tick += async (_, _) => await LoadFeedAsync(silent: true);
         _autoRefreshTimer.Interval = Math.Max(1, _settings.RefreshMinutes) * 60 * 1000;
         _autoRefreshTimer.Start();
 
         Shown += async (_, _) => await LoadFeedAsync(silent: false);
-        Resize += (_, _) => SaveWindowBounds();
+        Resize += OnFormResize;
         Move += (_, _) => SaveWindowBounds();
-        FormClosing += (_, _) => _settings.Save();
+        FormClosing += (_, _) =>
+        {
+            _loadCts?.Cancel();
+            _settings.Save();
+        };
+    }
+
+    private void OnFormResize(object? sender, EventArgs e)
+    {
+        SaveWindowBounds();
+        ApplyRoundedCorners();
+        AdjustCardWidths();
+    }
+
+    private void ApplyRoundedCorners()
+    {
+        const int radius = 16;
+        var path = new GraphicsPath();
+        var rect = ClientRectangle;
+        if (rect.Width < 2 || rect.Height < 2) return;
+
+        path.AddArc(rect.X, rect.Y, radius, radius, 180, 90);
+        path.AddArc(rect.Right - radius, rect.Y, radius, radius, 270, 90);
+        path.AddArc(rect.Right - radius, rect.Bottom - radius, radius, radius, 0, 90);
+        path.AddArc(rect.X, rect.Bottom - radius, radius, radius, 90, 90);
+        path.CloseFigure();
+        Region = new Region(path);
     }
 
     private void BuildUi()
     {
         _header.Dock = DockStyle.Top;
-        _header.Height = 92;
-        _header.Padding = new Padding(14, 10, 14, 10);
+        _header.Height = 88;
+        _header.Padding = new Padding(14, 10, 10, 10);
         _header.BackColor = Color.Transparent;
         _header.MouseDown += BeginDrag;
         Controls.Add(_header);
+
+        _closeButton.Text = "✕";
+        _closeButton.Width = 32;
+        _closeButton.Height = 28;
+        _closeButton.FlatStyle = FlatStyle.Flat;
+        _closeButton.FlatAppearance.BorderSize = 0;
+        _closeButton.Cursor = Cursors.Hand;
+        _closeButton.Dock = DockStyle.Right;
+        _closeButton.Click += (_, _) => Close();
+        _header.Controls.Add(_closeButton);
 
         var headerText = new Panel
         {
@@ -77,8 +115,8 @@ public sealed class MainForm : Form
 
         _titleLabel.Text = "本周放送列表";
         _titleLabel.Dock = DockStyle.Top;
-        _titleLabel.Font = new Font("Segoe UI Semibold", 17F, FontStyle.Bold);
-        _titleLabel.Height = 30;
+        _titleLabel.Font = new Font("Segoe UI Semibold", 16F, FontStyle.Bold);
+        _titleLabel.Height = 28;
         _titleLabel.MouseDown += BeginDrag;
         headerText.Controls.Add(_titleLabel);
 
@@ -90,40 +128,36 @@ public sealed class MainForm : Form
         _updatedLabel.MouseDown += BeginDrag;
         headerText.Controls.Add(_updatedLabel);
 
-        var buttons = new FlowLayoutPanel
-        {
-            Dock = DockStyle.Right,
-            Width = 210,
-            FlowDirection = FlowDirection.TopDown,
-            WrapContents = false,
-            Padding = new Padding(0, 0, 0, 0),
-            BackColor = Color.Transparent
-        };
-        buttons.MouseDown += BeginDrag;
-        _header.Controls.Add(buttons);
+        _headerButtons.Dock = DockStyle.Right;
+        _headerButtons.Width = 200;
+        _headerButtons.FlowDirection = FlowDirection.TopDown;
+        _headerButtons.WrapContents = false;
+        _headerButtons.Padding = new Padding(0, 0, 4, 0);
+        _headerButtons.BackColor = Color.Transparent;
+        _headerButtons.MouseDown += BeginDrag;
+        _header.Controls.Add(_headerButtons);
 
-        buttons.Controls.Add(CreateHeaderButton("↻ 刷新", (_, _) => _ = LoadFeedAsync(false)));
-        buttons.Controls.Add(CreateHeaderButton("◐ 主题", (_, _) => ToggleTheme()));
-        buttons.Controls.Add(CreateHeaderButton("⚙ 设置", (_, _) => OpenSettings()));
+        _headerButtons.Controls.Add(CreateHeaderButton("↻ 刷新", (_, _) => _ = LoadFeedAsync(false)));
+        _headerButtons.Controls.Add(CreateHeaderButton("◐ 主题", (_, _) => ToggleTheme()));
+        _headerButtons.Controls.Add(CreateHeaderButton("⚙ 设置", (_, _) => OpenSettings()));
 
         _content.Dock = DockStyle.Fill;
-        _content.Padding = new Padding(14, 0, 14, 14);
+        _content.Padding = new Padding(14, 0, 14, 12);
         _content.BackColor = Color.Transparent;
         Controls.Add(_content);
 
         var controlsRow = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 118,
-            BackColor = Color.Transparent,
-            Margin = new Padding(0)
+            Height = 108,
+            BackColor = Color.Transparent
         };
         _content.Controls.Add(controlsRow);
 
         var opacityGroup = MakeGroup("透明度");
-        opacityGroup.Width = 210;
-        opacityGroup.Height = 100;
-        opacityGroup.Location = new Point(0, 10);
+        opacityGroup.Width = 200;
+        opacityGroup.Height = 92;
+        opacityGroup.Location = new Point(0, 8);
         controlsRow.Controls.Add(opacityGroup);
 
         _opacityTrack.Dock = DockStyle.Fill;
@@ -135,14 +169,14 @@ public sealed class MainForm : Form
         {
             _settings.OpacityPercent = _opacityTrack.Value;
             ApplyVisualSettings();
-            SaveWindowBounds();
+            _settings.Save();
         };
         opacityGroup.Controls.Add(_opacityTrack);
 
         var accentGroup = MakeGroup("强调色");
-        accentGroup.Width = 186;
-        accentGroup.Height = 100;
-        accentGroup.Location = new Point(222, 10);
+        accentGroup.Width = 180;
+        accentGroup.Height = 92;
+        accentGroup.Location = new Point(212, 8);
         controlsRow.Controls.Add(accentGroup);
 
         _accentPanel.Dock = DockStyle.Fill;
@@ -164,19 +198,21 @@ public sealed class MainForm : Form
             var button = new Button
             {
                 Text = name,
-                Width = 32,
-                Height = 28,
-                Margin = new Padding(0, 0, 8, 8),
+                Width = 30,
+                Height = 26,
+                Margin = new Padding(0, 0, 6, 6),
                 FlatStyle = FlatStyle.Flat,
                 BackColor = ColorTranslator.FromHtml(hex),
                 ForeColor = Color.White,
-                Tag = hex
+                Tag = hex,
+                Cursor = Cursors.Hand
             };
             button.FlatAppearance.BorderSize = 0;
             button.Click += (_, _) =>
             {
                 _settings.AccentColor = hex;
                 ApplyVisualSettings();
+                ApplyTheme();
                 _settings.Save();
             };
             _accentPanel.Controls.Add(button);
@@ -186,7 +222,7 @@ public sealed class MainForm : Form
         _listPanel.FlowDirection = FlowDirection.TopDown;
         _listPanel.WrapContents = false;
         _listPanel.AutoScroll = true;
-        _listPanel.Padding = new Padding(0, 10, 0, 0);
+        _listPanel.Padding = new Padding(0, 8, 0, 0);
         _listPanel.BackColor = Color.Transparent;
         _content.Controls.Add(_listPanel);
 
@@ -210,13 +246,12 @@ public sealed class MainForm : Form
         {
             Text = title,
             Dock = DockStyle.Top,
-            Height = 22,
+            Height = 20,
             ForeColor = Color.FromArgb(230, 230, 230),
             Font = new Font("Segoe UI Semibold", 9F, FontStyle.Bold),
             Padding = new Padding(4, 2, 0, 0)
         };
         panel.Controls.Add(titleLabel);
-
         return panel;
     }
 
@@ -225,11 +260,11 @@ public sealed class MainForm : Form
         var button = new Button
         {
             Text = text,
-            Width = 92,
-            Height = 30,
-            Margin = new Padding(0, 0, 0, 8),
+            Width = 88,
+            Height = 28,
+            Margin = new Padding(0, 0, 0, 6),
             FlatStyle = FlatStyle.Flat,
-            BackColor = Color.FromArgb(255, 255, 255, 28),
+            BackColor = Color.FromArgb(40, 255, 255, 255),
             ForeColor = Color.White,
             Cursor = Cursors.Hand
         };
@@ -261,7 +296,7 @@ public sealed class MainForm : Form
                 : $"共 {feed.Items.Count} 条更新 · 最近同步 {feed.UpdatedAt:yyyy-MM-dd HH:mm}";
             _statusLabel.Text = string.IsNullOrWhiteSpace(_settings.FeedUrl)
                 ? "使用示例数据"
-                : $"来源：{_settings.FeedUrl}";
+                : TruncateUrl(_settings.FeedUrl);
         }
         catch (OperationCanceledException)
         {
@@ -269,10 +304,16 @@ public sealed class MainForm : Form
         catch (Exception ex)
         {
             _statusLabel.Text = $"加载失败，已切换到示例数据：{ex.Message}";
-            var demo = await _feedService.LoadAsync(null, CancellationToken.None);
+            var demo = FeedService.BuildDemoFeed();
             _currentFeed = demo;
             RenderFeed(demo);
         }
+    }
+
+    private static string TruncateUrl(string url)
+    {
+        if (url.Length <= 48) return $"来源：{url}";
+        return $"来源：{url[..22]}…{url[^18..]}";
     }
 
     private void RenderFeed(AnimeFeed feed)
@@ -292,25 +333,38 @@ public sealed class MainForm : Form
         }
 
         _listPanel.ResumeLayout();
+        ApplyTheme();
+        ApplyVisualSettings();
+    }
+
+    private void AdjustCardWidths()
+    {
+        var w = Math.Max(280, ClientSize.Width - 44);
+        foreach (Control c in _listPanel.Controls)
+        {
+            c.Width = w;
+        }
     }
 
     private Control CreateItemCard(AnimeFeedItem item)
     {
+        var accent = ColorTranslator.FromHtml(_settings.AccentColor);
         var card = new Panel
         {
-            Width = ClientSize.Width - 44,
-            Height = 78,
-            Margin = new Padding(0, 0, 0, 10),
-            Padding = new Padding(12, 10, 12, 10),
-            Cursor = Cursors.Hand
+            Width = Math.Max(280, ClientSize.Width - 44),
+            Height = 76,
+            Margin = new Padding(0, 0, 0, 8),
+            Padding = new Padding(14, 10, 12, 10),
+            Cursor = Cursors.Hand,
+            Tag = item
         };
 
         var titleLabel = new Label
         {
             Text = item.Title,
             Dock = DockStyle.Top,
-            Height = 34,
-            Font = new Font("Segoe UI Semibold", 10.8f, FontStyle.Bold),
+            Height = 32,
+            Font = new Font("Segoe UI Semibold", 10.5f, FontStyle.Bold),
             AutoEllipsis = true,
             Cursor = Cursors.Hand
         };
@@ -320,35 +374,43 @@ public sealed class MainForm : Form
             Text = BuildMetaText(item),
             Dock = DockStyle.Bottom,
             Height = 20,
-            ForeColor = Color.FromArgb(215, 215, 215),
+            ForeColor = Color.FromArgb(180, 185, 200),
             Cursor = Cursors.Hand
         };
 
         var actionLabel = new Label
         {
-            Text = "点击直接观看 ▶",
+            Text = "观看 ▶",
             Dock = DockStyle.Right,
-            Width = 120,
+            Width = 64,
             TextAlign = ContentAlignment.MiddleRight,
-            ForeColor = Color.White,
-            Cursor = Cursors.Hand
+            ForeColor = accent,
+            Cursor = Cursors.Hand,
+            Font = new Font("Segoe UI Semibold", 9f)
         };
+
+        void open() => OpenUrl(item.WatchUrl, item.Title);
+        card.Click += (_, _) => open();
+        titleLabel.Click += (_, _) => open();
+        metaLabel.Click += (_, _) => open();
+        actionLabel.Click += (_, _) => open();
 
         card.Controls.Add(actionLabel);
         card.Controls.Add(metaLabel);
         card.Controls.Add(titleLabel);
-        card.Click += (_, _) => OpenUrl(item.WatchUrl, item.Title);
-        titleLabel.Click += (_, _) => OpenUrl(item.WatchUrl, item.Title);
-        metaLabel.Click += (_, _) => OpenUrl(item.WatchUrl, item.Title);
-        actionLabel.Click += (_, _) => OpenUrl(item.WatchUrl, item.Title);
 
         card.Paint += (_, e) =>
         {
-            using var pen = new Pen(Color.FromArgb(55, 255, 255, 255));
+            e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;
             var rect = card.ClientRectangle;
             rect.Width -= 1;
             rect.Height -= 1;
-            e.Graphics.DrawRectangle(pen, rect);
+
+            using var borderPen = new Pen(Color.FromArgb(50, 255, 255, 255));
+            e.Graphics.DrawRectangle(borderPen, rect);
+
+            using var accentBrush = new SolidBrush(accent);
+            e.Graphics.FillRectangle(accentBrush, 0, 0, 4, card.Height);
         };
 
         return card;
@@ -375,10 +437,7 @@ public sealed class MainForm : Form
 
         try
         {
-            Process.Start(new ProcessStartInfo(url)
-            {
-                UseShellExecute = true
-            });
+            Process.Start(new ProcessStartInfo(url) { UseShellExecute = true });
         }
         catch (Exception ex)
         {
@@ -390,6 +449,7 @@ public sealed class MainForm : Form
     {
         _settings.Theme = _settings.Theme.Equals("dark", StringComparison.OrdinalIgnoreCase) ? "light" : "dark";
         ApplyTheme();
+        ApplyVisualSettings();
         _settings.Save();
     }
 
@@ -414,7 +474,7 @@ public sealed class MainForm : Form
         var back = dark ? _darkBack : _lightBack;
         var panel = dark ? _darkPanel : _lightPanel;
         var text = dark ? Color.White : Color.FromArgb(25, 30, 42);
-        var muted = dark ? Color.FromArgb(220, 220, 220) : Color.FromArgb(70, 80, 95);
+        var muted = dark ? Color.FromArgb(200, 205, 220) : Color.FromArgb(70, 80, 95);
 
         BackColor = back;
         ForeColor = text;
@@ -423,28 +483,25 @@ public sealed class MainForm : Form
         _titleLabel.ForeColor = text;
         _updatedLabel.ForeColor = muted;
         _statusLabel.ForeColor = muted;
-
-        foreach (Control control in Controls)
-        {
-            control.BackColor = control == _header || control == _content ? back : control.BackColor;
-        }
-
-        var headerButtons = _header.Controls.OfType<FlowLayoutPanel>().FirstOrDefault();
-        if (headerButtons is not null)
-        {
-            foreach (Control button in headerButtons.Controls)
-            {
-                button.BackColor = panel;
-                button.ForeColor = text;
-            }
-        }
-
         _listPanel.BackColor = back;
         _opacityTrack.BackColor = back;
+
+        _closeButton.BackColor = back;
+        _closeButton.ForeColor = muted;
+
+        foreach (Control button in _headerButtons.Controls)
+        {
+            button.BackColor = panel;
+            button.ForeColor = text;
+        }
 
         foreach (Control group in _content.Controls.OfType<Panel>())
         {
             group.BackColor = back;
+            foreach (Control child in group.Controls.OfType<Label>())
+            {
+                child.ForeColor = muted;
+            }
         }
 
         foreach (Control card in _listPanel.Controls)
@@ -453,7 +510,14 @@ public sealed class MainForm : Form
             foreach (Control child in card.Controls)
             {
                 child.BackColor = panel;
-                child.ForeColor = text;
+                if (child is Label lbl && lbl.Text == "观看 ▶")
+                {
+                    lbl.ForeColor = ColorTranslator.FromHtml(_settings.AccentColor);
+                }
+                else
+                {
+                    child.ForeColor = text;
+                }
             }
         }
 
@@ -469,16 +533,22 @@ public sealed class MainForm : Form
         var accent = ColorTranslator.FromHtml(_settings.AccentColor);
 
         _titleLabel.ForeColor = accent;
-        _settingsButton.ForeColor = Color.White;
 
         foreach (Button btn in _accentPanel.Controls.OfType<Button>())
         {
-            btn.FlatAppearance.BorderSize = string.Equals((string?)btn.Tag, _settings.AccentColor, StringComparison.OrdinalIgnoreCase) ? 2 : 0;
+            var selected = string.Equals((string?)btn.Tag, _settings.AccentColor, StringComparison.OrdinalIgnoreCase);
+            btn.FlatAppearance.BorderSize = selected ? 2 : 0;
             btn.FlatAppearance.BorderColor = Color.White;
         }
 
         _opacityTrack.Value = Math.Clamp(_settings.OpacityPercent, 55, 100);
         _autoRefreshTimer.Interval = Math.Max(1, _settings.RefreshMinutes) * 60 * 1000;
+
+        foreach (Control card in _listPanel.Controls)
+        {
+            card.Invalidate();
+        }
+
         Invalidate(true);
     }
 
@@ -496,11 +566,7 @@ public sealed class MainForm : Form
 
     private void BeginDrag(object? sender, MouseEventArgs e)
     {
-        if (e.Button != MouseButtons.Left)
-        {
-            return;
-        }
-
+        if (e.Button != MouseButtons.Left) return;
         ReleaseCapture();
         SendMessage(Handle, WM_NCLBUTTONDOWN, HTCAPTION, 0);
     }
