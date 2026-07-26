@@ -6,18 +6,22 @@ use std::path::PathBuf;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WidgetSettings {
-    /// 数据源：HTTP(S) URL 或本地路径；空则用内置示例
     #[serde(default)]
     pub feed_source: String,
     #[serde(default = "default_true")]
     pub always_on_top: bool,
-    #[serde(default)]
+    #[serde(default = "default_true")]
     pub dark_theme: bool,
-    /// 0=紫 1=青 2=绿 3=粉 4=橙
     #[serde(default)]
     pub accent_index: u8,
     #[serde(default = "default_opacity")]
     pub opacity: f32,
+    #[serde(default = "default_refresh")]
+    pub refresh_minutes: u32,
+    #[serde(default = "default_sort")]
+    pub sort_mode: u8,
+    #[serde(default)]
+    pub only_today: bool,
     #[serde(default)]
     pub window_x: Option<f32>,
     #[serde(default)]
@@ -28,12 +32,10 @@ pub struct WidgetSettings {
     pub window_h: Option<f32>,
 }
 
-fn default_true() -> bool {
-    true
-}
-fn default_opacity() -> f32 {
-    0.95
-}
+fn default_true() -> bool { true }
+fn default_opacity() -> f32 { 0.95 }
+fn default_refresh() -> u32 { 15 }
+fn default_sort() -> u8 { 1 }
 
 impl Default for WidgetSettings {
     fn default() -> Self {
@@ -43,10 +45,13 @@ impl Default for WidgetSettings {
             dark_theme: true,
             accent_index: 0,
             opacity: 0.95,
+            refresh_minutes: 15,
+            sort_mode: 1,
+            only_today: false,
             window_x: None,
             window_y: None,
-            window_w: Some(360.0),
-            window_h: Some(520.0),
+            window_w: Some(380.0),
+            window_h: Some(560.0),
         }
     }
 }
@@ -68,7 +73,13 @@ impl WidgetSettings {
             .ok()
             .and_then(|s| serde_json::from_str(&s).ok())
         {
-            Some(s) => s,
+            Some(mut s) => {
+                if s.refresh_minutes < 1 {
+                    s.refresh_minutes = 1;
+                }
+                s.opacity = s.opacity.clamp(0.5, 1.0);
+                s
+            }
             None => Self::default(),
         }
     }
