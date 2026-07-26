@@ -32,10 +32,18 @@ pub struct WidgetSettings {
     pub window_h: Option<f32>,
 }
 
-fn default_true() -> bool { true }
-fn default_opacity() -> f32 { 0.95 }
-fn default_refresh() -> u32 { 15 }
-fn default_sort() -> u8 { 1 }
+fn default_true() -> bool {
+    true
+}
+fn default_opacity() -> f32 {
+    0.95
+}
+fn default_refresh() -> u32 {
+    15
+}
+fn default_sort() -> u8 {
+    1
+}
 
 impl Default for WidgetSettings {
     fn default() -> Self {
@@ -69,19 +77,17 @@ impl WidgetSettings {
         if !path.exists() {
             return Self::default();
         }
-        match fs::read_to_string(&path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-        {
-            Some(mut s) => {
-                if s.refresh_minutes < 1 {
-                    s.refresh_minutes = 1;
-                }
-                s.opacity = s.opacity.clamp(0.5, 1.0);
-                s
-            }
-            None => Self::default(),
+        let Ok(text) = fs::read_to_string(&path) else {
+            return Self::default();
+        };
+        let Ok(mut s) = serde_json::from_str::<WidgetSettings>(&text) else {
+            return Self::default();
+        };
+        if s.refresh_minutes < 1 {
+            s.refresh_minutes = 1;
         }
+        s.opacity = s.opacity.clamp(0.5, 1.0);
+        s
     }
 
     pub fn save(&self) -> Result<()> {
