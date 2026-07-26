@@ -11,8 +11,8 @@ use eframe::egui;
 
 fn main() -> eframe::Result<()> {
     let settings = settings::WidgetSettings::load();
-    let w = settings.window_w.unwrap_or(360.0);
-    let h = settings.window_h.unwrap_or(520.0);
+    let w = settings.window_w.unwrap_or(380.0).clamp(280.0, 1200.0);
+    let h = settings.window_h.unwrap_or(560.0).clamp(320.0, 1600.0);
 
     let mut viewport = egui::ViewportBuilder::default()
         .with_inner_size([w, h])
@@ -20,6 +20,7 @@ fn main() -> eframe::Result<()> {
         .with_decorations(false)
         .with_transparent(true)
         .with_resizable(true)
+        .with_taskbar(true)
         .with_window_level(if settings.always_on_top {
             egui::WindowLevel::AlwaysOnTop
         } else {
