@@ -1,5 +1,6 @@
 use crate::agedm;
 use crate::feed;
+use crate::fonts;
 use crate::models::{FeedData, FeedItem};
 use crate::settings::WidgetSettings;
 use crate::util::{expire_toast, truncate_middle};
@@ -32,6 +33,9 @@ pub struct AnimeWidgetApp {
 
 impl AnimeWidgetApp {
     pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        // 加载系统中文字体，避免乱码 / 方框
+        fonts::setup_cjk_fonts(&cc.egui_ctx);
+
         let settings = WidgetSettings::load();
         let mut style = (*cc.egui_ctx.style()).clone();
         style.spacing.item_spacing = Vec2::new(8.0, 6.0);
