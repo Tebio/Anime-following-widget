@@ -282,7 +282,7 @@ impl eframe::App for AnimeWidgetApp {
                 Frame::none()
                     .fill(fill)
                     .rounding(egui::Rounding::same(14.0))
-                    .stroke(Stroke::new(1.0, accent.gamma_multiply(0.5)))
+                    .stroke(Stroke::new(1.0_f32, accent.gamma_multiply(0.5)))
                     .inner_margin(Margin::same(12.0)),
             )
             .show(ctx, |ui| {
