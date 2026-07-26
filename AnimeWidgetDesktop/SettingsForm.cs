@@ -30,8 +30,8 @@ public sealed class SettingsForm : Form
         MinimizeBox = false;
         MaximizeBox = false;
         ShowInTaskbar = false;
-        Width = 620;
-        Height = 270;
+        Width = 640;
+        Height = 300;
         BackColor = Color.FromArgb(25, 28, 40);
         ForeColor = Color.White;
         Font = new Font("Segoe UI", 10F);
@@ -40,15 +40,16 @@ public sealed class SettingsForm : Form
         {
             Dock = DockStyle.Fill,
             ColumnCount = 2,
-            RowCount = 4,
+            RowCount = 5,
             Padding = new Padding(16),
             BackColor = BackColor
         };
-        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 130));
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 140));
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
-        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 52));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+        layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
 
         layout.Controls.Add(MakeLabel("更新源 URL"), 0, 0);
@@ -56,20 +57,30 @@ public sealed class SettingsForm : Form
         _feedUrlBox.Text = Result.FeedUrl;
         layout.Controls.Add(_feedUrlBox, 1, 0);
 
-        layout.Controls.Add(MakeLabel("自动刷新(分钟)"), 0, 1);
+        var tip = new Label
+        {
+            Text = "支持 https 链接或本地 JSON 路径；留空则使用内置示例数据",
+            Dock = DockStyle.Fill,
+            ForeColor = Color.FromArgb(160, 165, 180),
+            Font = new Font("Segoe UI", 8.5f),
+            TextAlign = ContentAlignment.TopLeft
+        };
+        layout.Controls.Add(tip, 1, 1);
+
+        layout.Controls.Add(MakeLabel("自动刷新(分钟)"), 0, 2);
         _refreshMinutesBox.Dock = DockStyle.Left;
         _refreshMinutesBox.Minimum = 1;
         _refreshMinutesBox.Maximum = 120;
         _refreshMinutesBox.Value = Math.Clamp(Result.RefreshMinutes, 1, 120);
         _refreshMinutesBox.Width = 110;
-        layout.Controls.Add(_refreshMinutesBox, 1, 1);
+        layout.Controls.Add(_refreshMinutesBox, 1, 2);
 
-        layout.Controls.Add(MakeLabel("置顶显示"), 0, 2);
+        layout.Controls.Add(MakeLabel("置顶显示"), 0, 3);
         _alwaysOnTopBox.Text = "始终置顶";
         _alwaysOnTopBox.Checked = Result.AlwaysOnTop;
         _alwaysOnTopBox.AutoSize = true;
         _alwaysOnTopBox.ForeColor = ForeColor;
-        layout.Controls.Add(_alwaysOnTopBox, 1, 2);
+        layout.Controls.Add(_alwaysOnTopBox, 1, 3);
 
         var buttonPanel = new FlowLayoutPanel
         {
@@ -86,7 +97,7 @@ public sealed class SettingsForm : Form
         buttonPanel.Controls.Add(okButton);
         buttonPanel.Controls.Add(cancelButton);
 
-        layout.Controls.Add(buttonPanel, 1, 3);
+        layout.Controls.Add(buttonPanel, 1, 4);
         Controls.Add(layout);
 
         AcceptButton = okButton;
