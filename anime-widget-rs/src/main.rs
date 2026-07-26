@@ -5,6 +5,7 @@ mod app;
 mod feed;
 mod models;
 mod settings;
+mod util;
 
 use app::AnimeWidgetApp;
 use eframe::egui;
