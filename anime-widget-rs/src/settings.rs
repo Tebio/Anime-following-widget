@@ -1,102 +1,108 @@
-use anyhow::{Context, Result};
+//! 设置持久化：%APPDATA%\AnimeFollowingWidget\settings.json
+//! 另缓存最近一次成功抓取的周表 cache.json，离线启动也有数据。
+
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct WidgetSettings {
-    #[serde(default)]
-    pub feed_source: String,
-    #[serde(default = "default_true")]
-    pub always_on_top: bool,
-    #[serde(default = "default_true")]
-    pub dark_theme: bool,
-    #[serde(default)]
-    pub accent_index: u8,
-    #[serde(default = "default_opacity")]
-    pub opacity: f32,
-    #[serde(default = "default_refresh")]
-    pub refresh_minutes: u32,
-    #[serde(default = "default_sort")]
-    pub sort_mode: u8,
-    #[serde(default)]
-    pub only_today: bool,
-    #[serde(default)]
-    pub window_x: Option<f32>,
-    #[serde(default)]
-    pub window_y: Option<f32>,
-    #[serde(default)]
-    pub window_w: Option<f32>,
-    #[serde(default)]
-    pub window_h: Option<f32>,
+#[serde(default)]
+pub struct Settings {
+    /// 强调色索引（ACCENTS）
+    pub accent: usize,
+    /// 整体窗口不透明度 0.3~1.0
+    pub window_opacity: f32,
+    /// 背景深浅 0.0(最浅)~1.0(最深)
+    pub bg_darkness: f32,
+    /// 锁定位置（禁止拖拽）
+    pub locked: bool,
+    /// 鼠标穿透
+    pub click_through: bool,
+    /// 上次窗口位置（逻辑像素）
+    pub pos: Option<(f32, f32)>,
+    /// 自动刷新间隔（分钟）
+    pub refresh_minutes: u64,
 }
 
-fn default_true() -> bool {
-    true
-}
-fn default_opacity() -> f32 {
-    0.95
-}
-fn default_refresh() -> u32 {
-    15
-}
-fn default_sort() -> u8 {
-    1
-}
-
-impl Default for WidgetSettings {
+impl Default for Settings {
     fn default() -> Self {
         Self {
-            feed_source: String::new(),
-            always_on_top: true,
-            dark_theme: true,
-            accent_index: 0,
-            opacity: 0.95,
-            refresh_minutes: 15,
-            sort_mode: 1,
-            only_today: false,
-            window_x: None,
-            window_y: None,
-            window_w: Some(380.0),
-            window_h: Some(560.0),
+            accent: 0,
+            window_opacity: 0.95,
+            bg_darkness: 0.85,
+            locked: false,
+            click_through: false,
+            pos: None,
+            refresh_minutes: 30,
         }
     }
 }
 
-pub fn settings_path() -> PathBuf {
-    dirs::data_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("AnimeFollowingWidget")
-        .join("settings.json")
+/// 强调色预设（RGB）
+pub const ACCENTS: [(&str, [u8; 3]); 5] = [
+    ("青绿", [45, 212, 191]),
+    ("香槟金", [229, 192, 123]),
+    ("雾紫", [179, 157, 219]),
+    ("樱粉", [244, 143, 177]),
+    ("暖橙", [255, 171, 145]),
+];
+
+fn config_dir() -> PathBuf {
+    let base = dirs::config_dir()
+        .or_else(dirs::home_dir)
+        .unwrap_or_else(|| PathBuf::from("."));
+    base.join("AnimeFollowingWidget")
 }
 
-impl WidgetSettings {
+fn settings_path() -> PathBuf {
+    config_dir().join("settings.json")
+}
+
+pub fn cache_path() -> PathBuf {
+    config_dir().join("cache.json")
+}
+
+impl Settings {
     pub fn load() -> Self {
-        let path = settings_path();
-        if !path.exists() {
-            return Self::default();
-        }
-        let Ok(text) = fs::read_to_string(&path) else {
-            return Self::default();
-        };
-        let Ok(mut s) = serde_json::from_str::<WidgetSettings>(&text) else {
-            return Self::default();
-        };
-        if s.refresh_minutes < 1 {
-            s.refresh_minutes = 1;
-        }
-        s.opacity = s.opacity.clamp(0.5, 1.0);
-        s
+        fs::read_to_string(settings_path())
+            .ok()
+            .and_then(|s| serde_json::from_str(&s).ok())
+            .unwrap_or_default()
     }
 
-    pub fn save(&self) -> Result<()> {
-        let path = settings_path();
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).context("创建配置目录失败")?;
+    pub fn save(&self) {
+        let dir = config_dir();
+        let _ = fs::create_dir_all(&dir);
+        if let Ok(json) = serde_json::to_string_pretty(self) {
+            let _ = fs::write(settings_path(), json);
         }
-        let json = serde_json::to_string_pretty(self)?;
-        fs::write(&path, json).context("写入 settings.json 失败")?;
-        Ok(())
+    }
+
+    pub fn accent_rgb(&self) -> [u8; 3] {
+        ACCENTS
+            .get(self.accent)
+            .map(|a| a.1)
+            .unwrap_or(ACCENTS[0].1)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn roundtrip() {
+        let s = Settings::default();
+        let json = serde_json::to_string(&s).unwrap();
+        let back: Settings = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.accent, 0);
+        assert!((back.window_opacity - 0.95).abs() < f32::EPSILON);
+        assert_eq!(back.refresh_minutes, 30);
+    }
+
+    #[test]
+    fn missing_fields_defaulted() {
+        let back: Settings = serde_json::from_str("{}").unwrap();
+        assert!((back.window_opacity - 0.95).abs() < f32::EPSILON);
     }
 }
