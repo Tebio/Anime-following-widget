@@ -60,7 +60,7 @@ impl AnimeWidgetApp {
             .fill(bg)
             .rounding(egui::Rounding::same(10.0))
             .stroke(Stroke::new(
-                1.5,
+                1.5_f32,
                 if today {
                     Color32::from_rgb(239, 68, 68)
                 } else {
@@ -138,8 +138,11 @@ impl AnimeWidgetApp {
 
         if response.hovered() {
             ui.ctx().set_cursor_icon(egui::CursorIcon::PointingHand);
-            ui.painter()
-                .rect_stroke(response.rect, 10.0, Stroke::new(1.5, accent.gamma_multiply(0.7)));
+            ui.painter().rect_stroke(
+                response.rect,
+                10.0,
+                Stroke::new(1.5_f32, accent.gamma_multiply(0.7)),
+            );
         }
         if response.clicked() {
             self.open_item(item);
