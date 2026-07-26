@@ -3,6 +3,7 @@
 mod agedm;
 mod app;
 mod feed;
+mod fonts;
 mod models;
 mod settings;
 mod util;
