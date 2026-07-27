@@ -54,7 +54,7 @@ public class AppSettings
 {
     public int Accent { get; set; } = 0;
     public double WindowOpacity { get; set; } = 0.95;
-    public double BgDarkness { get; set; } = 0.85;
+    public double BgDarkness { get; set; } = 0.55;
     public bool Locked { get; set; } = false;
     public bool ClickThrough { get; set; } = false;
     public bool Topmost { get; set; } = false;

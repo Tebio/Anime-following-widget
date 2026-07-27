@@ -106,10 +106,11 @@ public partial class MainWindow : Window
 
     private void ApplyBgDarkness()
     {
-        // bg_darkness 0(最浅)~1(最深)：控制根背景不透明度与深浅
+        // bg_darkness 0(通透磨砂)~1(深沉)：alpha 从 0x40 到 0x100，
+        // 默认 0.6 附近时卡片半透，底层亚克力磨砂透出来
         var d = Math.Clamp(_settings.BgDarkness, 0, 1);
         var v = (byte)(28 - d * 14);              // 28(亮灰黑) → 14(近黑)
-        var a = (byte)(0xD8 + d * 0x20);          // 越深越实
+        var a = (byte)Math.Min(255, 0x40 + d * 0xC0);
         RootBorder.Background = new SolidColorBrush(Color.FromArgb(a, v, (byte)(v + 2), (byte)(v + 8)));
     }
 
