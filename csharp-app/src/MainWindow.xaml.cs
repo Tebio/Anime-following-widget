@@ -75,6 +75,20 @@ public partial class MainWindow : Window
             UpdateStatus();
         };
         BuildTabs();
+
+        // 跨天自动切「今天」：每分钟检查日期变化（置灰/tab 高亮/副标题跟着翻页）
+        var lastDay = DateTime.Now.Date;
+        var dayTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
+        dayTimer.Tick += (_, _) =>
+        {
+            if (DateTime.Now.Date == lastDay) return;
+            lastDay = DateTime.Now.Date;
+            _vm.SelectedDay = _vm.TodayIndex;
+            _vm.RefreshEntries();
+            UpdateTabStyles();
+            UpdateStatus();
+        };
+        dayTimer.Start();
     }
 
     protected override void OnSourceInitialized(EventArgs e)
