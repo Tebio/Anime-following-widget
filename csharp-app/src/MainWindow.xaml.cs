@@ -129,10 +129,67 @@ public partial class MainWindow : Window
         base.OnSourceInitialized(e);
         _hwnd = new WindowInteropHelper(this).Handle;
         Win32.EnableAcrylic(_hwnd);
-        _layer = new DesktopLayer(_hwnd, _settings.EmbedMode);
+        // 整理软件在运行时不挂 WorkerW（会被它们的桌面表面盖住/随父层隐藏消失）
+        var want = _settings.EmbedMode;
+        bool blocked = want == EmbedMode.WorkerW && OrganizerDetect.AnyRunning();
+        _layer = new DesktopLayer(_hwnd, blocked ? EmbedMode.Normal : want);
         ApplyTopmost();
         ApplyClickThrough();
         SetupTray();
+        if (blocked) WarnOrganizer();
+        StartLayerWatchdog();
+    }
+
+    /// <summary>Win+D / 「显示桌面」会把普通窗口最小化——桌面小组件要留在桌面上。</summary>
+    protected override void OnStateChanged(EventArgs e)
+    {
+        base.OnStateChanged(e);
+        if (WindowState == WindowState.Minimized)
+        {
+            WindowState = WindowState.Normal;
+            Show();
+            _layer?.EnsureVisible();
+        }
+    }
+
+    // ---------- 桌面层看门狗 + 整理软件冲突 ----------
+
+    private bool _organizerWarned;
+
+    private void WarnOrganizer()
+    {
+        if (_organizerWarned) return;
+        _organizerWarned = true;
+        _tray?.ShowBalloonTip("检测到桌面整理软件",
+            "酷呆/iTop 等软件与壁纸层嵌入互相覆盖（小组件会被盖住找不到）。已自动切到普通窗口模式——普通模式现在也支持 Win+D 不消失。",
+            BalloonIcon.Warning);
+    }
+
+    /// <summary>10s 巡检：整理软件出现自动让位、退出自动恢复、WorkerW 父层丢失重挂。</summary>
+    private void StartLayerWatchdog()
+    {
+        var dog = new DispatcherTimer { Interval = TimeSpan.FromSeconds(10) };
+        dog.Tick += (_, _) =>
+        {
+            if (_layer == null || _settings.EmbedMode != EmbedMode.WorkerW) return;
+            bool organizer = OrganizerDetect.AnyRunning();
+            if (organizer && _layer.Mode == EmbedMode.WorkerW)
+            {
+                _layer.SetMode(EmbedMode.Normal);
+                ApplyTopmost();
+                WarnOrganizer();
+            }
+            else if (!organizer && _layer.Mode != EmbedMode.WorkerW)
+            {
+                _layer.SetMode(EmbedMode.WorkerW);
+                ApplyTopmost();
+            }
+            else
+            {
+                _layer.EnsureParented();
+            }
+        };
+        dog.Start();
     }
 
     /// <summary>置顶只在普通窗口模式下生效（嵌入桌面层后无意义）。</summary>
@@ -374,7 +431,12 @@ public partial class MainWindow : Window
     private void ToggleVisibility()
     {
         if (Visibility == Visibility.Visible) Hide();
-        else { Show(); Activate(); }
+        else
+        {
+            Show();
+            _layer?.EnsureVisible();
+            if ((_layer?.Mode ?? EmbedMode.Normal) == EmbedMode.Normal) Activate();
+        }
     }
 
     // ---------- 开机自启 ----------
@@ -466,6 +528,12 @@ public partial class MainWindow : Window
         };
         _settingsWin.EmbedModeChanged += mode =>
         {
+            // 用户偏好保留 WorkerW，运行时遇整理软件降级（看门狗会在整理软件退出后自动恢复）
+            if (mode == EmbedMode.WorkerW && OrganizerDetect.AnyRunning())
+            {
+                mode = EmbedMode.Normal;
+                WarnOrganizer();
+            }
             _layer?.SetMode(mode);
             ApplyTopmost();
         };

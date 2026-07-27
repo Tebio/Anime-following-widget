@@ -9,12 +9,42 @@ namespace AnimeWidget;
 public class DesktopLayer
 {
     private readonly IntPtr _hwnd;
-    public EmbedMode Mode { get; private set; } = EmbedMode.BottomPin;
+    public EmbedMode Mode { get; private set; } = EmbedMode.Normal;
 
     public DesktopLayer(IntPtr hwnd, EmbedMode want)
     {
         _hwnd = hwnd;
         SetMode(want);
+    }
+
+    /// <summary>显示状态下重新 assert 层级（托盘「显示」后调用，防被桌面格子/整理软件盖住）。</summary>
+    public void EnsureVisible()
+    {
+        if (!Win32.IsWindow(_hwnd)) return;
+        switch (Mode)
+        {
+            case EmbedMode.WorkerW:
+                Win32.SetWindowPos(_hwnd, IntPtr.Zero, 0, 0, 0, 0,
+                    Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_FRAMECHANGED | Win32.SWP_SHOWWINDOW);
+                Win32.ShowWindow(_hwnd, Win32.SW_SHOW);
+                break;
+            case EmbedMode.BottomPin:
+                Win32.SetWindowPos(_hwnd, new IntPtr(1), 0, 0, 0, 0,
+                    Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE | Win32.SWP_FRAMECHANGED);
+                Win32.ShowWindow(_hwnd, Win32.SW_SHOWNA);
+                break;
+        }
+    }
+
+    /// <summary>WorkerW 父层被重建/换柄后重新挂接（看门狗周期性调用）。</summary>
+    public void EnsureParented()
+    {
+        if (Mode != EmbedMode.WorkerW) return;
+        if (!Win32.IsWindow(_hwnd)) return; // 句柄已随父层销毁，WPF 层无法自救
+        var workerw = FindWorkerW();
+        if (workerw == IntPtr.Zero) return; // 桌面层重建中，下轮再试
+        if (Win32.GetParent(_hwnd) != workerw)
+            SetMode(EmbedMode.WorkerW); // 父层被换 → 重新挂接
     }
 
     public void SetMode(EmbedMode mode)
@@ -138,6 +168,8 @@ internal static class Win32
     }
 
     [DllImport("user32.dll")] public static extern IntPtr SetParent(IntPtr hWndChild, IntPtr hWndNewParent);
+    [DllImport("user32.dll")] public static extern IntPtr GetParent(IntPtr hWnd);
+    [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr hWnd);
     [DllImport("user32.dll")] public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
     [DllImport("user32.dll")] public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
