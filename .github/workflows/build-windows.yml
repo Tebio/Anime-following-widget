@@ -15,7 +15,8 @@ on:
     branches:
       - main
     tags:
-      - "v*"
+      # C# 版已废弃，只对 v1.x 标签发版；v2+ 由 build-rust-windows.yml 负责
+      - "v1.*"
 
 permissions:
   contents: write
