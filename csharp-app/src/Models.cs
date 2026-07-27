@@ -60,6 +60,8 @@ public class AppSettings
     public bool Topmost { get; set; } = false;
     public double? Left { get; set; }
     public double? Top { get; set; }
+    public double? Width { get; set; }
+    public double? Height { get; set; }
     public int RefreshMinutes { get; set; } = 30;
     public ClickTarget ClickTarget { get; set; } = ClickTarget.Detail;
     public EmbedMode EmbedMode { get; set; } = EmbedMode.Normal;

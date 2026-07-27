@@ -63,6 +63,8 @@ public partial class SettingsWindow : Window
         LastErrorText.Text = sched.LastError != null ? $"最近错误：\n{sched.LastError}" : "";
 
         _ready = true;
+        OpacityValue.Text = $"{_settings.WindowOpacity:P0}";
+        DarknessValue.Text = $"{_settings.BgDarkness:P0}";
     }
 
     private void BuildAccentRadios()
@@ -133,6 +135,7 @@ public partial class SettingsWindow : Window
     {
         if (!_ready || RefreshCombo.SelectedItem is not ComboBoxItem item) return;
         _settings.RefreshMinutes = (int)item.Tag;
+        _sched.SetInterval((int)item.Tag); // 立即生效，不用重启
         _settings.Save();
     }
 

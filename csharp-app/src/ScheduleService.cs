@@ -13,7 +13,6 @@ public class ScheduleService : IDisposable
     public static readonly string[] Mirrors = { "https://www.agedm.io", "https://www.age.tv" };
     public static readonly string[] WeekdayNames = { "周一", "周二", "周三", "周四", "周五", "周六", "周日" };
 
-    private readonly HttpClient _client;
     private readonly string _proxyDesc;
     private CancellationTokenSource? _cts;
 
@@ -26,6 +25,19 @@ public class ScheduleService : IDisposable
 
     public ScheduleService()
     {
+        _proxyDesc = ProxyDetect.Detect() ?? "直连";
+    }
+
+    /// <summary>运行时改刷新间隔（设置窗改动立即生效）。</summary>
+    public void SetInterval(int minutes) =>
+        _timer.Interval = TimeSpan.FromMinutes(minutes).TotalMilliseconds;
+
+    /// <summary>
+    /// 每次抓取新建 client：代理设置实时重读（OpenClash 开关不用重启），
+    /// 30 分钟级抓取频率不需要 keep-alive。
+    /// </summary>
+    private HttpClient BuildClient()
+    {
         var proxy = ProxyDetect.Detect();
         var handler = new HttpClientHandler();
         if (proxy != null)
@@ -36,12 +48,12 @@ public class ScheduleService : IDisposable
         }
         else
         {
-            // 显式禁用 IE 默认代理探测：直连失败时错误更干净，且避免 WPAD 卡顿
             handler.UseProxy = false;
             _proxyDesc = "直连";
         }
-        _client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(20) };
-        _client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0");
+        var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(20) };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0");
+        return client;
     }
 
     public string ProxyDesc => _proxyDesc;
@@ -76,12 +88,13 @@ public class ScheduleService : IDisposable
 
     private async Task FetchAndPublish(CancellationToken ct)
     {
+        using var client = BuildClient(); // 每次重读代理设置
         var errors = new List<string>();
         foreach (var baseUrl in Mirrors)
         {
             try
             {
-                var html = await _client.GetStringAsync(baseUrl, ct);
+                var html = await client.GetStringAsync(baseUrl, ct);
                 var sched = Parse(html, baseUrl);
                 if (sched.Days.Any(d => d.Entries.Count > 0))
                 {
@@ -192,6 +205,5 @@ public class ScheduleService : IDisposable
     public void Dispose()
     {
         _cts?.Cancel();
-        _client.Dispose();
     }
 }

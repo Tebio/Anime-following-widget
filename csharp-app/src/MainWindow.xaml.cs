@@ -40,6 +40,8 @@ public partial class MainWindow : Window
             Left = wa.Right - Width - 24;
             Top = wa.Top + 80;
         }
+        if (_settings.Width.HasValue) Width = _settings.Width.Value;
+        if (_settings.Height.HasValue) Height = _settings.Height.Value;
         Opacity = _settings.WindowOpacity;
 
         ApplyAccent();
@@ -170,6 +172,9 @@ public partial class MainWindow : Window
             var idx = (int)child.Tag;
             var sp = (StackPanel)child.Child;
             var txt = (TextBlock)sp.Children[0];
+            // 今日圆点跟随强调色（修复切换强调色后圆点保持旧色）
+            if (sp.Children.Count > 1 && sp.Children[1] is TextBlock dot)
+                dot.Foreground = _vm.AccentBrush;
             if (idx == _vm.SelectedDay)
             {
                 child.Background = new SolidColorBrush(
@@ -415,8 +420,15 @@ public partial class MainWindow : Window
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        if (!_dragging || e.LeftButton != MouseButtonState.Pressed) return;
+        if (e.LeftButton != MouseButtonState.Pressed) return;
         var cursor = PointToScreen(e.GetPosition(this));
+        if (_resizing)
+        {
+            Width = Math.Max(MinWidth, _resizeW + cursor.X - _resizeOrigin.X);
+            Height = Math.Max(MinHeight, _resizeH + cursor.Y - _resizeOrigin.Y);
+            return;
+        }
+        if (!_dragging) return;
         Left = cursor.X - _dragOffset.X;
         Top = cursor.Y - _dragOffset.Y;
     }
@@ -424,6 +436,13 @@ public partial class MainWindow : Window
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonUp(e);
+        if (_resizing)
+        {
+            _resizing = false;
+            ReleaseMouseCapture();
+            Persist();
+            return;
+        }
         if (!_dragging) return;
         _dragging = false;
         ReleaseMouseCapture();
@@ -443,13 +462,20 @@ public partial class MainWindow : Window
         else if (Math.Abs(wa.Bottom - (Top + Height)) < SnapDist) Top = wa.Bottom - Height - EdgeMargin;
     }
 
+    // 手动缩放：WorkerW 子窗口下 WM_NCLBUTTONDOWN HTBOTTOMRIGHT 和 DragMove 一样失效
+    private bool _resizing;
+    private Point _resizeOrigin;
+    private double _resizeW, _resizeH;
+
     private void Grip_Resize(object sender, MouseButtonEventArgs e)
     {
-        if (e.ChangedButton == MouseButton.Left && _hwnd != IntPtr.Zero)
-        {
-            Win32.BeginNativeResize(_hwnd);
-            Persist();
-        }
+        if (e.ChangedButton != MouseButton.Left) return;
+        _resizing = true;
+        _resizeOrigin = PointToScreen(e.GetPosition(this));
+        _resizeW = Width;
+        _resizeH = Height;
+        CaptureMouse();
+        e.Handled = true;
     }
 
     private void ApplyClickThrough()
@@ -474,6 +500,8 @@ public partial class MainWindow : Window
     {
         _settings.Left = Left;
         _settings.Top = Top;
+        _settings.Width = Width;
+        _settings.Height = Height;
         _settings.Save();
     }
 
