@@ -13,8 +13,9 @@ public class ScheduleService : IDisposable
     public static readonly string[] Mirrors = { "https://www.agedm.io", "https://www.age.tv" };
     public static readonly string[] WeekdayNames = { "周一", "周二", "周三", "周四", "周五", "周六", "周日" };
 
-    private readonly string _proxyDesc;
+    private string _proxyDesc;
     private CancellationTokenSource? _cts;
+    private int _intervalMinutes = 30;
 
     public WeekSchedule? Current { get; private set; }
     public string? LastError { get; private set; }
@@ -28,9 +29,8 @@ public class ScheduleService : IDisposable
         _proxyDesc = ProxyDetect.Detect() ?? "直连";
     }
 
-    /// <summary>运行时改刷新间隔（设置窗改动立即生效）。</summary>
-    public void SetInterval(int minutes) =>
-        _timer.Interval = TimeSpan.FromMinutes(minutes).TotalMilliseconds;
+    /// <summary>运行时改刷新间隔（下一轮循环生效）。</summary>
+    public void SetInterval(int minutes) => _intervalMinutes = minutes;
 
     /// <summary>
     /// 每次抓取新建 client：代理设置实时重读（OpenClash 开关不用重启），
@@ -68,19 +68,20 @@ public class ScheduleService : IDisposable
             ScheduleUpdated?.Invoke(cached);
         }
         _cts = new CancellationTokenSource();
-        _ = Task.Run(() => Loop(refreshMinutes, _cts.Token));
+        _intervalMinutes = refreshMinutes;
+        _ = Task.Run(() => Loop(_cts.Token));
     }
 
     public void RefreshNow() => _ = Task.Run(() => FetchAndPublish(_cts?.Token ?? default));
 
-    private async Task Loop(int refreshMinutes, CancellationToken ct)
+    private async Task Loop(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
         {
             await FetchAndPublish(ct);
             try
             {
-                await Task.Delay(TimeSpan.FromMinutes(Math.Max(5, refreshMinutes)), ct);
+                await Task.Delay(TimeSpan.FromMinutes(Math.Max(5, _intervalMinutes)), ct);
             }
             catch (TaskCanceledException) { }
         }
