@@ -1,53 +1,118 @@
-//! Windows 桌面层：把窗口挂到桌面壁纸层（WorkerW），实现
-//! 「只在桌面可见，打开窗口就被盖住，Win+D 仍可见」。
+//! Windows 桌面层：把窗口挂到桌面壁纸层（WorkerW）或置底，实现
+//! 「只在桌面可见，打开窗口就被盖住」。
 //! 另提供：鼠标穿透、整体透明度、窗口移动/取位置、屏幕尺寸。
 //! 非 Windows 平台全部降级为空操作（方便 Linux 下跑测试）。
 
+use serde::{Deserialize, Serialize};
+
+/// 桌面嵌入方式
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum EmbedMode {
+    /// 挂到壁纸层 WorkerW：Win+D 不消失（部分系统上点击可能不命中）
+    WorkerW,
+    /// 普通窗口压到 Z 序最底：点击兼容性最好，但 Win+D 会一起隐藏
+    BottomPin,
+}
+
+impl Default for EmbedMode {
+    fn default() -> Self {
+        EmbedMode::WorkerW
+    }
+}
+
 #[cfg(windows)]
 mod imp {
+    use super::EmbedMode;
     use windows::core::{w, BOOL, PCWSTR};
     use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
     use windows::Win32::UI::WindowsAndMessaging::*;
 
     pub struct DesktopLayer {
         hwnd: HWND,
-        parented: bool,
+        mode: EmbedMode,
     }
 
     impl DesktopLayer {
         /// 由 eframe 的 raw window handle 创建，并尝试挂到桌面层。
-        pub fn attach(hwnd_isize: isize) -> Self {
+        pub fn attach(hwnd_isize: isize, want: EmbedMode) -> Self {
             let hwnd = HWND(hwnd_isize as _);
             let mut layer = DesktopLayer {
                 hwnd,
-                parented: false,
+                mode: EmbedMode::BottomPin,
             };
             unsafe {
                 // 不参与 Alt-Tab / 任务栏，不抢焦点
                 layer.add_ex_style(WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE);
-                if let Some(workerw) = find_workerw() {
-                    // SetParent 之前去掉 WS_POPUP、加 WS_CHILD，避免坐标异常
-                    let style = GetWindowLongPtrW(hwnd, GWL_STYLE);
-                    let new_style = (style & !(WS_POPUP.0 as isize)) | (WS_CHILD.0 as isize);
-                    SetWindowLongPtrW(hwnd, GWL_STYLE, new_style);
-                    if SetParent(hwnd, Some(workerw)).is_ok() {
-                        layer.parented = true;
+            }
+            layer.set_mode(want);
+            layer
+        }
+
+        pub fn mode(&self) -> EmbedMode {
+            self.mode
+        }
+
+        /// 运行时切换桌面嵌入方式
+        pub fn set_mode(&mut self, mode: EmbedMode) {
+            if self.mode == mode {
+                return;
+            }
+            unsafe {
+                match mode {
+                    EmbedMode::WorkerW => {
+                        if let Some(workerw) = find_workerw() {
+                            let style = GetWindowLongPtrW(self.hwnd, GWL_STYLE);
+                            SetWindowLongPtrW(
+                                self.hwnd,
+                                GWL_STYLE,
+                                (style & !(WS_POPUP.0 as isize)) | (WS_CHILD.0 as isize),
+                            );
+                            if SetParent(self.hwnd, Some(workerw)).is_ok() {
+                                self.mode = EmbedMode::WorkerW;
+                                self.refresh_frame();
+                                return;
+                            }
+                        }
+                        // 找不到壁纸层就退回置底
+                        self.force_bottom_pin();
                     }
-                }
-                if !layer.parented {
-                    // 兜底：压到 Z 序最底
-                    let _ = SetWindowPos(
-                        hwnd,
-                        Some(HWND_BOTTOM),
-                        0,
-                        0,
-                        0,
-                        0,
-                        SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE,
-                    );
+                    EmbedMode::BottomPin => self.force_bottom_pin(),
                 }
             }
-            layer
+        }
+
+        unsafe fn force_bottom_pin(&mut self) {
+            let style = GetWindowLongPtrW(self.hwnd, GWL_STYLE);
+            SetWindowLongPtrW(
+                self.hwnd,
+                GWL_STYLE,
+                (style & !(WS_CHILD.0 as isize)) | (WS_POPUP.0 as isize),
+            );
+            // 解除父子关系，恢复顶层窗口
+            let _ = SetParent(self.hwnd, None);
+            let _ = SetWindowPos(
+                self.hwnd,
+                Some(HWND_BOTTOM),
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+            );
+            self.mode = EmbedMode::BottomPin;
+        }
+
+        unsafe fn refresh_frame(&self) {
+            let _ = ShowWindow(self.hwnd, SW_SHOW);
+            let _ = SetWindowPos(
+                self.hwnd,
+                None,
+                0,
+                0,
+                0,
+                0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+            );
         }
 
         unsafe fn ex_style(&self) -> isize {
@@ -153,13 +218,19 @@ mod imp {
 
 #[cfg(not(windows))]
 mod imp {
+    use super::EmbedMode;
+
     /// Linux/macOS 下的空实现，只为让 `cargo test` 能跑。
     pub struct DesktopLayer;
 
     impl DesktopLayer {
-        pub fn attach(_hwnd_isize: isize) -> Self {
+        pub fn attach(_hwnd_isize: isize, _want: EmbedMode) -> Self {
             DesktopLayer
         }
+        pub fn mode(&self) -> EmbedMode {
+            EmbedMode::BottomPin
+        }
+        pub fn set_mode(&mut self, _mode: EmbedMode) {}
         pub fn set_click_through(&self, _on: bool) {}
         pub fn set_opacity(&self, _alpha: f32) {}
         pub fn set_pos(&self, _x: i32, _y: i32) {}

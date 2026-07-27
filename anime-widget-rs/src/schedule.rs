@@ -172,26 +172,33 @@ fn is_hhmm(s: &str) -> bool {
 }
 
 /// 抓取周表：按 MIRRORS 顺序 failover，第一个解析出数据的镜像胜出（阻塞，放后台线程用）。
+/// 自动应用 Windows 系统代理 / 环境变量代理（ureq 默认不走系统代理，
+/// 国内直连 agedm 会被 DNS 污染掐掉）。
 pub fn fetch_schedule() -> Result<WeekSchedule, String> {
-    let agent = ureq::AgentBuilder::new()
+    let proxy = crate::proxy::detect_proxy();
+    let mut builder = ureq::AgentBuilder::new()
         .timeout_connect(std::time::Duration::from_secs(8))
-        .timeout_read(std::time::Duration::from_secs(15))
-        .build();
-    let mut last_err = String::new();
+        .timeout_read(std::time::Duration::from_secs(15));
+    if let Some(p) = &proxy {
+        match ureq::Proxy::new(p.clone()) {
+            Ok(px) => builder = builder.proxy(px),
+            Err(e) => eprintln!("[anime-widget] 代理地址无效 {p}: {e}"),
+        }
+    }
+    let agent = builder.build();
+    let via = proxy.as_deref().unwrap_or("直连");
+
+    let mut errors = Vec::new();
     for base in MIRRORS {
         match fetch_one(&agent, base) {
             Ok(sched) => return Ok(sched),
             Err(e) => {
-                log_warn(&format!("镜像 {base} 失败: {e}"));
-                last_err = e;
+                eprintln!("[anime-widget] 镜像 {base} 失败({via}): {e}");
+                errors.push(format!("{base} → {e}"));
             }
         }
     }
-    Err(format!("全部镜像不可用（最后错误: {last_err}）"))
-}
-
-fn log_warn(msg: &str) {
-    eprintln!("[anime-widget] {msg}");
+    Err(format!("全部镜像不可用（{via}）：\n{}", errors.join("\n")))
 }
 
 fn fetch_one(agent: &ureq::Agent, base: &str) -> Result<WeekSchedule, String> {

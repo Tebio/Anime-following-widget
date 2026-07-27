@@ -148,11 +148,18 @@ impl WidgetApp {
         use raw_window_handle::{HasWindowHandle, RawWindowHandle};
         if let Ok(handle) = frame.window_handle() {
             if let RawWindowHandle::Win32(win) = handle.as_raw() {
-                let layer = DesktopLayer::attach(win.hwnd.get());
+                let layer = DesktopLayer::attach(win.hwnd.get(), self.settings.embed_mode);
                 layer.set_opacity(self.settings.window_opacity);
                 layer.set_click_through(self.effective_click_through());
                 self.layer = Some(layer);
             }
+        }
+    }
+
+    /// 设置里切换了桌面嵌入方式时调用
+    fn apply_embed_mode(&mut self) {
+        if let Some(layer) = &mut self.layer {
+            layer.set_mode(self.settings.embed_mode);
         }
     }
 
@@ -320,14 +327,20 @@ impl eframe::App for WidgetApp {
 
 impl WidgetApp {
     fn draw_header(&mut self, ui: &mut Ui, ctx: &Context, accent: Color32) {
+        // 第一行：标题 + 操作按钮
         ui.horizontal(|ui| {
-            ui.label(RichText::new("本周放送列表").size(17.0).strong());
+            // 强调色圆点 + 标题
+            let (dot_rect, _) = ui.allocate_exact_size(Vec2::splat(8.0), Sense::hover());
+            ui.painter().circle_filled(dot_rect.center(), 4.0, accent);
+            ui.label(RichText::new("本周放送").size(17.0).strong());
+
             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                 let gear = ui.add(Label::new(RichText::new("⚙").size(14.0)).sense(Sense::click()));
                 if gear.clicked() {
                     self.settings_open = !self.settings_open;
                     self.apply_layer_flags();
                 }
+                gear.on_hover_text("设置");
                 let icon = if self.fetch_in_flight { "…" } else { "⟳" };
                 let refresh = ui.add(
                     Label::new(RichText::new(icon).size(14.0).color(accent)).sense(Sense::click()),
@@ -335,42 +348,113 @@ impl WidgetApp {
                 if refresh.clicked() {
                     self.start_fetch(ctx);
                 }
-                if let Some(sched) = &self.schedule {
-                    let host = sched
-                        .base
-                        .trim_start_matches("https://")
-                        .trim_start_matches("http://");
-                    ui.label(
-                        RichText::new(format!("更新于 {} · {}", sched.fetched_at, host))
-                            .size(10.0)
-                            .color(Color32::from_gray(120)),
-                    )
-                    .on_hover_text(format!("数据源: {}", sched.base));
-                }
+                refresh.on_hover_text("立即刷新");
             });
         });
-        if let Some(err) = &self.error {
-            ui.label(
-                RichText::new(format!("⚠ {err}（显示缓存数据）"))
-                    .size(11.0)
-                    .color(Color32::from_rgb(230, 126, 98)),
-            );
+
+        // 第二行：日期 · 今日更新 · 数据源
+        let today = today_index();
+        let date_str = chrono::Local::now().format("%-m月%-d日").to_string();
+        let today_count = self
+            .schedule
+            .as_ref()
+            .and_then(|s| s.days.get(today))
+            .map(|d| d.entries.len())
+            .unwrap_or(0);
+        let mut sub = format!(
+            "{date_str} {} · 今日 {today_count} 部",
+            WEEKDAY_NAMES[today]
+        );
+        if let Some(sched) = &self.schedule {
+            let host = sched
+                .base
+                .trim_start_matches("https://")
+                .trim_start_matches("http://");
+            sub.push_str(&format!(" · {} · 更新于 {}", host, sched.fetched_at));
+        }
+        let sub_label = ui.label(RichText::new(sub).size(10.5).color(Color32::from_gray(125)));
+        if let Some(sched) = &self.schedule {
+            sub_label.on_hover_text(format!("数据源: {}", sched.base));
+        }
+
+        // 错误横幅
+        if let Some(err) = self.error.clone() {
+            ui.add_space(2.0);
+            Frame::new()
+                .fill(Color32::from_rgb(80, 40, 32))
+                .corner_radius(8.0)
+                .inner_margin(Margin::symmetric(8, 6))
+                .show(ui, |ui| {
+                    ui.label(
+                        RichText::new(format!("⚠ {err}"))
+                            .size(10.5)
+                            .color(Color32::from_rgb(240, 160, 140)),
+                    );
+                    if ui
+                        .add(Label::new(
+                            RichText::new("点击重试")
+                                .size(10.5)
+                                .color(accent)
+                                .underline(),
+                        ))
+                        .interact(Sense::click())
+                        .clicked()
+                    {
+                        self.start_fetch(ctx);
+                    }
+                });
         }
     }
 
     fn draw_tabs(&mut self, ui: &mut Ui, accent: Color32) {
+        let today = today_index();
         ui.horizontal(|ui| {
+            ui.spacing_mut().item_spacing.x = 3.0;
             for (i, name) in WEEKDAY_NAMES.iter().enumerate() {
                 let selected = self.selected_day == i;
-                let text = if selected {
-                    RichText::new(*name).size(13.0).color(accent).strong()
+                let is_today = i == today;
+
+                let (bg, fg) = if selected {
+                    (accent.gamma_multiply(0.22), accent)
+                } else if is_today {
+                    (Color32::from_white_alpha(6), Color32::from_gray(215))
                 } else {
-                    RichText::new(*name)
-                        .size(13.0)
-                        .color(Color32::from_gray(150))
+                    (Color32::TRANSPARENT, Color32::from_gray(145))
                 };
-                if ui.selectable_label(selected, text).clicked() {
+
+                let inner = Frame::new()
+                    .fill(bg)
+                    .corner_radius(9.0)
+                    .inner_margin(Margin::symmetric(8, 3))
+                    .show(ui, |ui| {
+                        let mut text = RichText::new(*name).size(12.5).color(fg);
+                        if selected {
+                            text = text.strong();
+                        }
+                        ui.label(text);
+                        if is_today {
+                            // 今日小圆点
+                            let (r, _) = ui.allocate_exact_size(Vec2::splat(4.0), Sense::hover());
+                            ui.painter().circle_filled(
+                                r.center(),
+                                2.0,
+                                if selected {
+                                    accent
+                                } else {
+                                    Color32::from_gray(120)
+                                },
+                            );
+                        }
+                    });
+                let resp = inner.response.interact(Sense::click());
+                if resp.hovered() {
+                    ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
+                }
+                if resp.clicked() {
                     self.selected_day = i;
+                }
+                if is_today {
+                    resp.on_hover_text("今天");
                 }
             }
         });
@@ -413,8 +497,19 @@ impl WidgetApp {
     }
 
     fn draw_row(&mut self, ui: &mut Ui, entry: &Entry, accent: Color32, base: &str) {
-        let row_h = 24.0;
+        let row_h = 26.0;
         let row_w = ui.available_width();
+
+        // 整行 rect + hover 检测（先量再画，颜色当帧生效）
+        let (row_rect, _) = ui.allocate_exact_size(Vec2::new(row_w, row_h), Sense::hover());
+        let hovered = ui
+            .ctx()
+            .input(|i| i.pointer.hover_pos())
+            .map_or(false, |p| row_rect.contains(p));
+        if hovered {
+            ui.painter()
+                .rect_filled(row_rect, 7.0, Color32::from_white_alpha(8));
+        }
 
         // 右侧文本：「23:00 第04集」或完结
         let mut right = String::new();
@@ -435,7 +530,7 @@ impl WidgetApp {
                     .layout_no_wrap("完结".into(), font_sub.clone(), END_PINK)
                     .rect
                     .width()
-                    + 8.0
+                    + 12.0 // 胶囊 padding
             } else {
                 0.0
             };
@@ -450,62 +545,67 @@ impl WidgetApp {
             end_w + text_w
         };
         let new_w = if entry.is_new { 36.0 } else { 0.0 };
-        let title_w = (row_w - right_w - new_w - 4.0).max(40.0);
+        let title_w = (row_w - right_w - new_w - 8.0).max(40.0);
 
-        let resp = ui.horizontal(|row_ui| {
-            // 标题（点击 → AGE 搜索；拖动 → 移动卡片）
-            let title = row_ui.add_sized(
-                [title_w, row_h - 6.0],
-                Label::new(RichText::new(&entry.title).size(14.0))
-                    .sense(Sense::click_and_drag())
-                    .truncate(),
-            );
-            let hover_tip = match self.settings.click_target {
-                crate::settings::ClickTarget::Detail => {
-                    format!("打开「{}」详情页", entry.title)
-                }
-                crate::settings::ClickTarget::Search => {
-                    format!("在 AGE 动漫搜索「{}」", entry.title)
-                }
-            };
-            let title = title.on_hover_text(hover_tip);
-            if title.hovered() {
-                row_ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
-                // hover 下划线
-                let r = title.rect;
-                row_ui.painter().line_segment(
-                    [r.left_bottom(), r.right_bottom()],
-                    egui::Stroke::new(1.0_f32, accent),
-                );
+        let mut row_ui = ui.new_child(
+            egui::UiBuilder::new()
+                .max_rect(row_rect)
+                .layout(Layout::left_to_right(Align::Center)),
+        );
+        row_ui.spacing_mut().item_spacing.x = 6.0;
+
+        // 标题（点击 → 打开；拖动 → 移动卡片）
+        let title_color = if hovered {
+            accent
+        } else {
+            Color32::from_gray(225)
+        };
+        let title = row_ui.add_sized(
+            [title_w, row_h - 8.0],
+            Label::new(RichText::new(&entry.title).size(13.5).color(title_color))
+                .sense(Sense::click_and_drag())
+                .truncate(),
+        );
+        let hover_tip = match self.settings.click_target {
+            crate::settings::ClickTarget::Detail => {
+                format!("打开「{}」详情页", entry.title)
             }
-            if title.clicked() {
-                let url = match self.settings.click_target {
-                    crate::settings::ClickTarget::Detail => entry.detail_url_with(base),
-                    crate::settings::ClickTarget::Search => entry.search_url_with(base),
-                };
-                let _ = open::that(url);
+            crate::settings::ClickTarget::Search => {
+                format!("在 AGE 动漫搜索「{}」", entry.title)
             }
-            self.handle_drag(row_ui.ctx(), &title);
-
-            if entry.is_new {
-                row_ui.label(RichText::new("New!").size(11.0).italics().color(NEW_RED));
-            }
-
-            row_ui.with_layout(Layout::right_to_left(Align::Center), |row_ui| {
-                if entry.is_end {
-                    row_ui.label(RichText::new("完结").size(12.0).italics().color(END_PINK));
-                }
-                if !right.is_empty() {
-                    row_ui.label(RichText::new(&right).size(12.0).color(SUB_GRAY));
-                }
-            });
-        });
-
-        // 行 hover 微高亮
-        if resp.response.hovered() {
-            ui.painter()
-                .rect_filled(resp.response.rect, 6.0, Color32::from_white_alpha(5));
+        };
+        let title = title.on_hover_text(hover_tip);
+        if title.hovered() {
+            row_ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
         }
+        if title.clicked() {
+            let url = match self.settings.click_target {
+                crate::settings::ClickTarget::Detail => entry.detail_url_with(base),
+                crate::settings::ClickTarget::Search => entry.search_url_with(base),
+            };
+            let _ = open::that(url);
+        }
+        self.handle_drag(row_ui.ctx(), &title);
+
+        if entry.is_new {
+            row_ui.label(RichText::new("New!").size(10.5).italics().color(NEW_RED));
+        }
+
+        row_ui.with_layout(Layout::right_to_left(Align::Center), |row_ui| {
+            if entry.is_end {
+                // 完结胶囊
+                Frame::new()
+                    .fill(END_PINK.gamma_multiply(0.16))
+                    .corner_radius(7.0)
+                    .inner_margin(Margin::symmetric(6, 1))
+                    .show(row_ui, |row_ui| {
+                        row_ui.label(RichText::new("完结").size(10.5).color(END_PINK));
+                    });
+            }
+            if !right.is_empty() {
+                row_ui.label(RichText::new(&right).size(11.5).color(SUB_GRAY));
+            }
+        });
     }
 
     fn context_menu(&mut self, ctx: &Context, response: &egui::Response) {
@@ -548,6 +648,17 @@ impl WidgetApp {
             .resizable(false)
             .anchor(egui::Align2::RIGHT_TOP, Vec2::new(-10.0, 10.0))
             .show(ctx, |ui| {
+                let section = |ui: &mut Ui, name: &str| {
+                    ui.add_space(4.0);
+                    ui.label(
+                        RichText::new(name)
+                            .size(11.0)
+                            .color(Color32::from_gray(130))
+                            .strong(),
+                    );
+                };
+
+                section(ui, "外观");
                 ui.label("整体透明度");
                 if ui
                     .add(egui::Slider::new(
@@ -559,7 +670,6 @@ impl WidgetApp {
                     self.apply_layer_flags();
                     self.dirty = true;
                 }
-
                 ui.label("背景深浅");
                 if ui
                     .add(egui::Slider::new(&mut self.settings.bg_darkness, 0.0..=1.0))
@@ -567,9 +677,6 @@ impl WidgetApp {
                 {
                     self.dirty = true;
                 }
-
-                ui.add_space(6.0);
-                ui.label("强调色");
                 ui.horizontal(|ui| {
                     for (i, (name, rgb)) in ACCENTS.iter().enumerate() {
                         let c = Color32::from_rgb(rgb[0], rgb[1], rgb[2]);
@@ -590,9 +697,9 @@ impl WidgetApp {
                     }
                 });
 
-                ui.add_space(6.0);
-                ui.label("点击番名打开");
+                section(ui, "行为");
                 ui.horizontal(|ui| {
+                    ui.label("点击番名");
                     use crate::settings::ClickTarget;
                     for (target, label, tip) in [
                         (
@@ -613,8 +720,6 @@ impl WidgetApp {
                         }
                     }
                 });
-
-                ui.add_space(6.0);
                 if ui
                     .checkbox(&mut self.settings.locked, "锁定位置（禁止拖拽）")
                     .changed()
@@ -631,7 +736,35 @@ impl WidgetApp {
                     self.dirty = true;
                 }
 
-                ui.add_space(6.0);
+                section(ui, "桌面嵌入");
+                use crate::win32::EmbedMode;
+                ui.horizontal(|ui| {
+                    for (mode, label, tip) in [
+                        (
+                            EmbedMode::WorkerW,
+                            "壁纸层",
+                            "挂在桌面壁纸层：Win+D 不消失。若点不了卡片请切换「置底窗口」",
+                        ),
+                        (
+                            EmbedMode::BottomPin,
+                            "置底窗口",
+                            "普通窗口压到最底：点击兼容性最好，但 Win+D 会一起隐藏",
+                        ),
+                    ] {
+                        let selected = self.settings.embed_mode == mode;
+                        if ui
+                            .selectable_label(selected, label)
+                            .on_hover_text(tip)
+                            .clicked()
+                        {
+                            self.settings.embed_mode = mode;
+                            self.apply_embed_mode();
+                            self.dirty = true;
+                        }
+                    }
+                });
+
+                section(ui, "数据");
                 ui.horizontal(|ui| {
                     ui.label("自动刷新（分钟）");
                     if ui
@@ -645,6 +778,31 @@ impl WidgetApp {
                         self.dirty = true;
                     }
                 });
+                let source = self
+                    .schedule
+                    .as_ref()
+                    .map(|s| format!("{} · 更新于 {}", s.base, s.fetched_at))
+                    .unwrap_or_else(|| "暂无数据".into());
+                ui.label(
+                    RichText::new(format!("数据源：{source}"))
+                        .size(10.5)
+                        .color(Color32::from_gray(140)),
+                );
+                let proxy_desc = crate::proxy::detect_proxy()
+                    .map(|p| format!("代理：{p}"))
+                    .unwrap_or_else(|| "代理：未使用（直连）".into());
+                ui.label(
+                    RichText::new(proxy_desc)
+                        .size(10.5)
+                        .color(Color32::from_gray(140)),
+                );
+                if let Some(err) = &self.error {
+                    ui.label(
+                        RichText::new(format!("最近错误：{err}"))
+                            .size(10.0)
+                            .color(Color32::from_rgb(230, 126, 98)),
+                    );
+                }
 
                 ui.add_space(4.0);
                 ui.label(

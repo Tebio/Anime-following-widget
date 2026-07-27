@@ -39,6 +39,8 @@ pub struct Settings {
     pub refresh_minutes: u64,
     /// 点击番名打开详情页还是搜索页
     pub click_target: ClickTarget,
+    /// 桌面嵌入方式
+    pub embed_mode: crate::win32::EmbedMode,
 }
 
 impl Default for Settings {
@@ -52,6 +54,7 @@ impl Default for Settings {
             pos: None,
             refresh_minutes: 30,
             click_target: ClickTarget::default(),
+            embed_mode: crate::win32::EmbedMode::default(),
         }
     }
 }

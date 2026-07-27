@@ -1,6 +1,6 @@
 [package]
 name = "anime-widget"
-version = "2.1.0"
+version = "2.2.0"
 edition = "2021"
 description = "Windows 桌面追番小组件（单文件免安装，AGE 动漫周表）"
 license = "MIT"
@@ -30,6 +30,7 @@ windows = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
     "Win32_Graphics_Gdi",
+    "Win32_System_Registry",
 ] }
 
 [profile.release]
