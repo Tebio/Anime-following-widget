@@ -47,6 +47,10 @@ public partial class SettingsWindow : Window
         LockCheck.Checked += (_, _) => { settings.Locked = true; settings.Save(); };
         LockCheck.Unchecked += (_, _) => { settings.Locked = false; settings.Save(); };
 
+        NotifyCheck.IsChecked = settings.NotifyOnAir;
+        NotifyCheck.Checked += (_, _) => { settings.NotifyOnAir = true; settings.Save(); };
+        NotifyCheck.Unchecked += (_, _) => { settings.NotifyOnAir = false; settings.Save(); };
+
         // 嵌入
         EmbedNormal.IsChecked = settings.EmbedMode == EmbedMode.Normal;
         EmbedWorkerW.IsChecked = settings.EmbedMode == EmbedMode.WorkerW;

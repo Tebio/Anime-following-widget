@@ -62,6 +62,7 @@
                     </Grid>
                     <CheckBox x:Name="ThroughCheck" Content="鼠标穿透（点击穿过卡片）"/>
                     <CheckBox x:Name="LockCheck" Content="锁定位置（禁止拖拽）"/>
+                    <CheckBox x:Name="NotifyCheck" Content="更新提醒（到点托盘气泡通知）"/>
                 </StackPanel>
             </Border>
 

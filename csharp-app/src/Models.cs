@@ -63,6 +63,7 @@ public class AppSettings
     public double? Width { get; set; }
     public double? Height { get; set; }
     public int RefreshMinutes { get; set; } = 30;
+    public bool NotifyOnAir { get; set; } = true;
     public ClickTarget ClickTarget { get; set; } = ClickTarget.Detail;
     public EmbedMode EmbedMode { get; set; } = EmbedMode.Normal;
 

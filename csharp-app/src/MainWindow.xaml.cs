@@ -76,19 +76,47 @@ public partial class MainWindow : Window
         };
         BuildTabs();
 
-        // 跨天自动切「今天」：每分钟检查日期变化（置灰/tab 高亮/副标题跟着翻页）
+        // 分钟级计时器：跨天自动翻页 + 到点置灰/提醒
         var lastDay = DateTime.Now.Date;
+        _lastAirCheck = DateTime.Now.TimeOfDay; // 启动前已播出的不补提醒
         var dayTimer = new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
         dayTimer.Tick += (_, _) =>
         {
-            if (DateTime.Now.Date == lastDay) return;
-            lastDay = DateTime.Now.Date;
-            _vm.SelectedDay = _vm.TodayIndex;
-            _vm.RefreshEntries();
-            UpdateTabStyles();
-            UpdateStatus();
+            var now = DateTime.Now.TimeOfDay;
+            if (DateTime.Now.Date != lastDay)
+            {
+                lastDay = DateTime.Now.Date;
+                _lastAirCheck = TimeSpan.Zero; // 新的一天从头检测到点
+                _vm.SelectedDay = _vm.TodayIndex;
+                _vm.RefreshEntries();
+                UpdateTabStyles();
+                UpdateStatus();
+            }
+            CheckAirTime(now);
         };
         dayTimer.Start();
+    }
+
+    /// <summary>上次到点检测的时刻（增量检测，避免重复提醒/开机补报）。</summary>
+    private TimeSpan _lastAirCheck;
+
+    /// <summary>到点检测：新播出的条目自动置灰，可选托盘气泡提醒。</summary>
+    private void CheckAirTime(TimeSpan now)
+    {
+        var today = _sched.Current?.Days.ElementAtOrDefault(_vm.TodayIndex);
+        if (today == null) { _lastAirCheck = now; return; }
+        var crossed = today.Entries.Where(e => e.Time != null
+                && TimeSpan.TryParseExact(e.Time, "hh\\:mm", null, out var t)
+                && t <= now && t > _lastAirCheck).ToList();
+        _lastAirCheck = now;
+        if (crossed.Count == 0) return;
+        _vm.RefreshEntries(); // 触发置灰重算
+        if (!_settings.NotifyOnAir) return;
+        var names = string.Join("、", crossed.Take(3).Select(e => e.Title));
+        if (crossed.Count > 3) names += $" 等 {crossed.Count} 部";
+        _tray?.ShowBalloonTip("番剧更新",
+            $"{names} {crossed[0].Label} 已播出",
+            Hardcodet.Wpf.TaskbarNotification.BalloonIcon.None);
     }
 
     protected override void OnSourceInitialized(EventArgs e)
