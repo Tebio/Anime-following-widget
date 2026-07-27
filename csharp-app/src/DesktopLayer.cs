@@ -186,7 +186,7 @@ internal static class Win32
             {
                 AccentState = 4,
                 AccentFlags = 2,
-                GradientColor = 0xB01E1410, // ABGR：alpha 0xB0(69%) + 深青灰 tint，磨砂感拉满
+                GradientColor = unchecked((int)0xB01E1410), // ABGR：alpha 0xB0(69%) + 深青灰 tint，磨砂感拉满
                 AnimationId = 0,
             };
             int size = Marshal.SizeOf(accent);
