@@ -40,12 +40,12 @@
                                     <TextBlock Text="New!" FontSize="10" FontStyle="Italic" FontWeight="Bold"
                                                Foreground="{StaticResource NewBrush}" Margin="6,0,0,0"
                                                VerticalAlignment="Center"
-                                               Visibility="{Binding IsNew, Converter={local:BoolVisConverter.Instance}}"/>
+                                               Visibility="{Binding IsNew, Converter={x:Static local:BoolVisConverter.Instance}}"/>
                                 </StackPanel>
 
                                 <!-- 右侧：时间+集数（完结条目隐藏，改显示完结胶囊） -->
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
-                                            Visibility="{Binding IsEnd, Converter={local:BoolVisConverter.Instance}, ConverterParameter=invert}">
+                                            Visibility="{Binding IsEnd, Converter={x:Static local:BoolVisConverter.Instance}, ConverterParameter=invert}">
                                     <TextBlock Text="{Binding TimeText}" FontSize="11.5"
                                                Foreground="#C8CBD6" Margin="0,0,5,0"/>
                                     <TextBlock Text="{Binding LabelText}" FontSize="10.5"
@@ -53,7 +53,7 @@
                                 </StackPanel>
                                 <Border Grid.Column="1" CornerRadius="6" Padding="6,1.5"
                                         Background="#2AE88BB0" VerticalAlignment="Center"
-                                        Visibility="{Binding IsEnd, Converter={local:BoolVisConverter.Instance}}">
+                                        Visibility="{Binding IsEnd, Converter={x:Static local:BoolVisConverter.Instance}}">
                                     <TextBlock Text="完结" FontSize="10" FontStyle="Italic"
                                                Foreground="{StaticResource EndBrush}"/>
                                 </Border>
