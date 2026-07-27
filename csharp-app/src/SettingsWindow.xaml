@@ -25,7 +25,7 @@
 
             <!-- 外观 -->
             <TextBlock Text="外观" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DimBrush}"/>
-            <Border Background="{StaticResource CardBrush}" CornerRadius="10" Padding="12,10" Margin="0,6,0,12">
+            <Border Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12" Margin="0,6,0,12">
                 <StackPanel>
                     <Grid>
                         <TextBlock Text="窗口透明度" FontSize="12" VerticalAlignment="Center"/>
@@ -48,7 +48,7 @@
 
             <!-- 行为 -->
             <TextBlock Text="行为" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DimBrush}"/>
-            <Border Background="{StaticResource CardBrush}" CornerRadius="10" Padding="12,10" Margin="0,6,0,12">
+            <Border Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12" Margin="0,6,0,12">
                 <StackPanel>
                     <TextBlock Text="点击番名打开" FontSize="12" Margin="0,0,0,2"/>
                     <StackPanel Orientation="Horizontal">
@@ -67,7 +67,7 @@
 
             <!-- 桌面嵌入 -->
             <TextBlock Text="桌面嵌入" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DimBrush}"/>
-            <Border Background="{StaticResource CardBrush}" CornerRadius="10" Padding="12,10" Margin="0,6,0,12">
+            <Border Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12" Margin="0,6,0,12">
                 <StackPanel>
                     <RadioButton x:Name="EmbedNormal" Content="普通窗口（默认，兼容 iTop/酷呆等桌面整理软件）" GroupName="embed"/>
                     <RadioButton x:Name="EmbedWorkerW" Content="壁纸层（Win+D 不消失，可能与桌面整理软件冲突）" GroupName="embed"/>
@@ -79,7 +79,7 @@
 
             <!-- 数据诊断 -->
             <TextBlock Text="数据" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DimBrush}"/>
-            <Border Background="{StaticResource CardBrush}" CornerRadius="10" Padding="12,10" Margin="0,6,0,4">
+            <Border Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12" Margin="0,6,0,4">
                 <StackPanel>
                     <TextBlock x:Name="ProxyText" FontSize="11" Foreground="{StaticResource SubBrush}"/>
                     <TextBlock x:Name="SourceTextDiag" FontSize="11" Foreground="{StaticResource SubBrush}"

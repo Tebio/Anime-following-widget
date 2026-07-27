@@ -125,9 +125,9 @@ public partial class MainWindow : Window
             var isToday = i == _vm.TodayIndex;
             var border = new Border
             {
-                CornerRadius = new CornerRadius(9),
-                Padding = new Thickness(8, 3.5, 8, 3.5),
-                Margin = new Thickness(0, 0, 3, 0),
+                CornerRadius = new CornerRadius(10),
+                Padding = new Thickness(9, 4.5, 9, 4.5),
+                Margin = new Thickness(0, 0, 4, 0),
                 Cursor = Cursors.Hand,
                 Tag = idx,
             };

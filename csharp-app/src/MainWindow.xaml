@@ -24,8 +24,8 @@
                     Click="Entry_Click">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="Transparent" CornerRadius="8"
-                                Padding="8,5" Margin="0,1">
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="9"
+                                Padding="10,7" Margin="0,1">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
@@ -37,7 +37,7 @@
                                                Foreground="{StaticResource FgBrush}"
                                                TextTrimming="CharacterEllipsis" MaxWidth="185"
                                                VerticalAlignment="Center"/>
-                                    <TextBlock Text="New!" FontSize="10" FontStyle="Italic" FontWeight="Bold"
+                                    <TextBlock Text="New!" FontSize="9.5" FontStyle="Italic" FontWeight="Bold"
                                                Foreground="{StaticResource NewBrush}" Margin="6,0,0,0"
                                                VerticalAlignment="Center"
                                                Visibility="{Binding IsNew, Converter={x:Static local:BoolVisConverter.Instance}}"/>
@@ -46,13 +46,13 @@
                                 <!-- 右侧：时间+集数（完结条目隐藏，改显示完结胶囊） -->
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
                                             Visibility="{Binding IsEnd, Converter={x:Static local:BoolVisConverter.Instance}, ConverterParameter=invert}">
-                                    <TextBlock Text="{Binding TimeText}" FontSize="11.5"
-                                               Foreground="#C8CBD6" Margin="0,0,5,0"/>
-                                    <TextBlock Text="{Binding LabelText}" FontSize="10.5"
+                                    <TextBlock Text="{Binding TimeText}" FontSize="11"
+                                               Foreground="#B9BDC9" Margin="0,0,5,0"/>
+                                    <TextBlock Text="{Binding LabelText}" FontSize="10"
                                                Foreground="{StaticResource SubBrush}"/>
                                 </StackPanel>
-                                <Border Grid.Column="1" CornerRadius="6" Padding="6,1.5"
-                                        Background="#2AE88BB0" VerticalAlignment="Center"
+                                <Border Grid.Column="1" CornerRadius="7" Padding="7,2"
+                                        Background="#26E88BB0" VerticalAlignment="Center"
                                         Visibility="{Binding IsEnd, Converter={x:Static local:BoolVisConverter.Instance}}">
                                     <TextBlock Text="完结" FontSize="10" FontStyle="Italic"
                                                Foreground="{StaticResource EndBrush}"/>
@@ -76,10 +76,17 @@
         </DataTemplate>
     </Window.Resources>
 
-    <Border x:Name="RootBorder" CornerRadius="12" BorderBrush="#1FFFFFFF" BorderThickness="1"
+    <Border x:Name="RootBorder" CornerRadius="14" BorderThickness="1"
             Margin="6">
+        <!-- 玻璃边缘：顶部受光、底部隐没 -->
+        <Border.BorderBrush>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                <GradientStop Color="#33FFFFFF" Offset="0"/>
+                <GradientStop Color="#0CFFFFFF" Offset="1"/>
+            </LinearGradientBrush>
+        </Border.BorderBrush>
         <Border.Effect>
-            <DropShadowEffect BlurRadius="18" ShadowDepth="0" Opacity="0.45" Color="Black"/>
+            <DropShadowEffect BlurRadius="26" ShadowDepth="3" Opacity="0.38" Color="Black"/>
         </Border.Effect>
         <Grid>
             <Grid.RowDefinitions>
@@ -100,13 +107,15 @@
                                    Foreground="{StaticResource FgBrush}" VerticalAlignment="Center"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                        <Button Content="⟳" FontSize="13" Cursor="Hand" ToolTip="立即刷新"
+                        <Button Content="&#xE72C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                FontSize="12" Cursor="Hand" ToolTip="立即刷新"
                                 Click="Refresh_Click" Background="Transparent" BorderThickness="0"
-                                Padding="2,0" Margin="0,0,4,0"
+                                Padding="4,2" Margin="0,0,4,0"
                                 Foreground="{Binding AccentBrush}"/>
-                        <Button Content="⚙" FontSize="13" Foreground="{StaticResource SubBrush}"
+                        <Button Content="&#xE713;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
+                                FontSize="12" Foreground="{StaticResource SubBrush}"
                                 Cursor="Hand" ToolTip="设置" Click="Settings_Click"
-                                Background="Transparent" BorderThickness="0" Padding="2,0"/>
+                                Background="Transparent" BorderThickness="0" Padding="4,2"/>
                     </StackPanel>
                 </Grid>
                 <TextBlock Text="{Binding Subtitle}" FontSize="10" Foreground="{StaticResource DimBrush}"
@@ -116,9 +125,9 @@
             </StackPanel>
 
             <!-- 错误横幅（点击重试） -->
-            <Border Grid.Row="1" x:Name="ErrorBanner" CornerRadius="8" Margin="12,4,12,0"
+            <Border Grid.Row="1" x:Name="ErrorBanner" CornerRadius="10" Margin="12,4,12,0"
                     Background="#26F04848" BorderBrush="#40F04848" BorderThickness="1"
-                    Padding="9,6" Cursor="Hand" MouseLeftButtonUp="ErrorBanner_Click"
+                    Padding="10,7" Cursor="Hand" MouseLeftButtonUp="ErrorBanner_Click"
                     Visibility="Collapsed" ToolTip="点击重试">
                 <StackPanel>
                     <TextBlock Text="⚠ 抓取失败" FontSize="11" FontWeight="SemiBold"
