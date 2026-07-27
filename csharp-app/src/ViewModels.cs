@@ -25,6 +25,7 @@ public class EntryViewModel
     public required string BaseUrl { get; init; }
     /// <summary>今日条目且播出时间已过 → 置灰。</summary>
     public bool IsPast { get; init; }
+    public bool IsFavorite { get; init; }
 
     public string Title => Model.Title;
     public bool IsNew => Model.IsNew;
@@ -32,6 +33,8 @@ public class EntryViewModel
     public string TimeText => Model.Time ?? "";
     public string LabelText => Model.Label;
     public double RowOpacity => IsPast ? 0.45 : 1.0;
+    /// <summary>星标：收藏常亮，未收藏半隐（hover 行时提亮由模板触发器负责）。</summary>
+    public double StarOpacity => IsFavorite ? 1.0 : 0.35;
 
     public string Url(ClickTarget target) =>
         target == ClickTarget.Detail ? Model.DetailUrl(BaseUrl) : Model.SearchUrl(BaseUrl);
@@ -42,6 +45,10 @@ public class AppViewModel : ObservableBase
     private WeekSchedule? _sched;
 
     public ObservableCollection<EntryViewModel> Entries { get; } = new();
+
+    /// <summary>收藏的 DetailId 集合（MainWindow 从设置同步）。</summary>
+    public HashSet<string> Favorites { get; set; } = new();
+    public bool FavoritesOnly { get; set; }
 
     private int _selectedDay = ScheduleService.TodayIndex();
     public int SelectedDay { get => _selectedDay; set { if (Set(ref _selectedDay, value)) RefreshEntries(); } }
@@ -102,11 +109,25 @@ public class AppViewModel : ObservableBase
         var now = DateTime.Now.TimeOfDay;
         foreach (var e in day.Entries)
         {
+            if (FavoritesOnly && !Favorites.Contains(e.DetailId)) continue;
             var isPast = isToday
                 && TimeSpan.TryParseExact(e.Time, "hh\\:mm", null, out var t)
                 && t < now;
-            Entries.Add(new EntryViewModel { Model = e, BaseUrl = _sched!.Base, IsPast = isPast });
+            Entries.Add(new EntryViewModel
+            {
+                Model = e,
+                BaseUrl = _sched!.Base,
+                IsPast = isPast,
+                IsFavorite = Favorites.Contains(e.DetailId),
+            });
         }
+        // 副标题计数跟随过滤状态（收藏切换/翻 tab 时保持准确）
+        var todayDay = _sched?.Days.ElementAtOrDefault(TodayIndex);
+        var todayCount = todayDay == null ? 0
+            : FavoritesOnly ? todayDay.Entries.Count(e => Favorites.Contains(e.DetailId))
+            : todayDay.Entries.Count;
+        Subtitle = $"{DateTime.Now:M月d日} {ScheduleService.WeekdayNames[TodayIndex]}"
+            + (todayDay != null ? $" · 今日 {todayCount} 部更新" : "");
         DayChanged?.Invoke();
     }
 

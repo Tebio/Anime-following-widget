@@ -31,6 +31,7 @@
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="Auto"/>
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -58,15 +59,30 @@
                                     <TextBlock Text="完结" FontSize="10" FontStyle="Italic"
                                                Foreground="{StaticResource EndBrush}"/>
                                 </Border>
+                                <!-- 收藏星标：嵌套 Button 吃点击，不触发整行跳转 -->
+                                <Button x:Name="StarBtn" Grid.Column="2" Tag="{Binding Model.DetailId}"
+                                        Click="Star_Click" Background="Transparent" BorderThickness="0"
+                                        Cursor="Hand" VerticalAlignment="Center" Margin="5,0,-2,0"
+                                        Padding="2" Opacity="{Binding StarOpacity}"
+                                        ToolTip="收藏（提醒只针对收藏的番）">
+                                    <Grid>
+                                        <TextBlock Text="★" FontSize="12"
+                                                   Foreground="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                   Visibility="{Binding IsFavorite, Converter={x:Static local:BoolVisConverter.Instance}}"/>
+                                        <TextBlock Text="☆" FontSize="12" Foreground="#8F93A3"
+                                                   Visibility="{Binding IsFavorite, Converter={x:Static local:BoolVisConverter.Instance}, ConverterParameter=invert}"/>
+                                    </Grid>
+                                </Button>
                             </Grid>
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{StaticResource CardHoverBrush}"/>
+                                <Setter TargetName="Bd" Property="Background" Value="#0FFFFFFF"/>
+                                <Setter TargetName="StarBtn" Property="Opacity" Value="1"/>
                                 <Setter TargetName="TitleText" Property="Foreground"
                                         Value="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=Window}}"/>
                             </Trigger>
-                            <!-- 完结条目：右侧时间列让位给胶囊 -->
+                            <!-- 完结条目：整行降透明度 -->
                             <DataTrigger Binding="{Binding IsEnd}" Value="True">
                                 <Setter TargetName="Bd" Property="Opacity" Value="0.72"/>
                             </DataTrigger>

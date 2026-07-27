@@ -64,6 +64,9 @@ public class AppSettings
     public double? Height { get; set; }
     public int RefreshMinutes { get; set; } = 30;
     public bool NotifyOnAir { get; set; } = true;
+    /// <summary>收藏的番（DetailId 集合），到点提醒只针对收藏。</summary>
+    public List<string> Favorites { get; set; } = new();
+    public bool FavoritesOnly { get; set; } = false;
     public ClickTarget ClickTarget { get; set; } = ClickTarget.Detail;
     public EmbedMode EmbedMode { get; set; } = EmbedMode.Normal;
 

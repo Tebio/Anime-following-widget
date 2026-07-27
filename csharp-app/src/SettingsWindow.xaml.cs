@@ -14,6 +14,9 @@ public partial class SettingsWindow : Window
     public event Action? AppearanceChanged;
     public event Action<EmbedMode>? EmbedModeChanged;
 
+    /// <summary>「只显示收藏」等影响列表的设置变更（MainWindow 订阅以刷新列表）。</summary>
+    public event Action? ListRefreshNeeded;
+
     public SettingsWindow(AppSettings settings, ScheduleService sched)
     {
         InitializeComponent();
@@ -50,6 +53,10 @@ public partial class SettingsWindow : Window
         NotifyCheck.IsChecked = settings.NotifyOnAir;
         NotifyCheck.Checked += (_, _) => { settings.NotifyOnAir = true; settings.Save(); };
         NotifyCheck.Unchecked += (_, _) => { settings.NotifyOnAir = false; settings.Save(); };
+
+        FavOnlyCheck.IsChecked = settings.FavoritesOnly;
+        FavOnlyCheck.Checked += (_, _) => { settings.FavoritesOnly = true; settings.Save(); ListRefreshNeeded?.Invoke(); };
+        FavOnlyCheck.Unchecked += (_, _) => { settings.FavoritesOnly = false; settings.Save(); ListRefreshNeeded?.Invoke(); };
 
         // 嵌入
         EmbedNormal.IsChecked = settings.EmbedMode == EmbedMode.Normal;

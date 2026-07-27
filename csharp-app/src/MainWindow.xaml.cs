@@ -67,6 +67,8 @@ public partial class MainWindow : Window
             ErrorBanner.Visibility = _vm.HasError ? Visibility.Visible : Visibility.Collapsed;
             UpdateStatus();
         });
+        _vm.Favorites = new HashSet<string>(_settings.Favorites);
+        _vm.FavoritesOnly = _settings.FavoritesOnly;
         _sched.Start(_settings.RefreshMinutes);
 
         _vm.DayChanged += () =>
@@ -112,10 +114,13 @@ public partial class MainWindow : Window
         if (crossed.Count == 0) return;
         _vm.RefreshEntries(); // 触发置灰重算
         if (!_settings.NotifyOnAir) return;
-        var names = string.Join("、", crossed.Take(3).Select(e => e.Title));
-        if (crossed.Count > 3) names += $" 等 {crossed.Count} 部";
+        // 只提醒收藏的番
+        var favCrossed = crossed.Where(e => _settings.Favorites.Contains(e.DetailId)).ToList();
+        if (favCrossed.Count == 0) return;
+        var names = string.Join("、", favCrossed.Take(3).Select(e => e.Title));
+        if (favCrossed.Count > 3) names += $" 等 {favCrossed.Count} 部";
         _tray?.ShowBalloonTip("番剧更新",
-            $"{names} {crossed[0].Label} 已播出",
+            $"{names} {favCrossed[0].Label} 已播出",
             Hardcodet.Wpf.TaskbarNotification.BalloonIcon.None);
     }
 
@@ -248,6 +253,18 @@ public partial class MainWindow : Window
             }
             catch { }
         }
+    }
+
+    /// <summary>星标点击：切换收藏（嵌套 Button，不会触发行跳转）。</summary>
+    private void Star_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement fe || fe.Tag is not string id || id.Length == 0) return;
+        if (_settings.Favorites.Contains(id)) _settings.Favorites.Remove(id);
+        else _settings.Favorites.Add(id);
+        _settings.Save();
+        _vm.Favorites = new HashSet<string>(_settings.Favorites);
+        _vm.RefreshEntries();
+        e.Handled = true;
     }
 
     // ---------- 托盘 ----------
@@ -451,6 +468,11 @@ public partial class MainWindow : Window
         {
             _layer?.SetMode(mode);
             ApplyTopmost();
+        };
+        _settingsWin.ListRefreshNeeded += () =>
+        {
+            _vm.FavoritesOnly = _settings.FavoritesOnly;
+            _vm.RefreshEntries();
         };
         _settingsWin.Closed += (_, _) =>
         {
