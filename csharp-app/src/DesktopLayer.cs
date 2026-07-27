@@ -19,30 +19,47 @@ public class DesktopLayer
 
     public void SetMode(EmbedMode mode)
     {
-        if (mode == EmbedMode.WorkerW)
+        switch (mode)
         {
-            var workerw = FindWorkerW();
-            if (workerw != IntPtr.Zero)
-            {
-                // 设为子窗口 + 去掉弹出样式，再 SetParent
-                long style = Win32.GetStyle(_hwnd);
-                Win32.SetStyle(_hwnd, (style & ~Win32.WS_POPUP) | Win32.WS_CHILD);
-                if (Win32.SetParent(_hwnd, workerw) != IntPtr.Zero)
+            case EmbedMode.WorkerW:
+                var workerw = FindWorkerW();
+                if (workerw != IntPtr.Zero)
                 {
-                    Mode = EmbedMode.WorkerW;
-                    Win32.SetWindowPos(_hwnd, IntPtr.Zero, 0, 0, 0, 0,
-                        Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOZORDER | Win32.SWP_FRAMECHANGED);
-                    Win32.ShowWindow(_hwnd, Win32.SW_SHOW);
-                    return;
+                    long style = Win32.GetStyle(_hwnd);
+                    Win32.SetStyle(_hwnd, (style & ~Win32.WS_POPUP) | Win32.WS_CHILD);
+                    if (Win32.SetParent(_hwnd, workerw) != IntPtr.Zero)
+                    {
+                        Mode = EmbedMode.WorkerW;
+                        // 提到兄弟窗口顶层：iTop/酷呆的桌面格子也挂在这层，别被它们盖住
+                        Win32.SetWindowPos(_hwnd, IntPtr.Zero, 0, 0, 0, 0,
+                            Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_FRAMECHANGED | Win32.SWP_SHOWWINDOW);
+                        Win32.ShowWindow(_hwnd, Win32.SW_SHOW);
+                        return;
+                    }
                 }
-            }
-            // WorkerW 找不到/挂不上 → 降级置底
-            ForceBottomPin();
+                ForceBottomPin(); // 找不到/挂不上 → 降级置底
+                break;
+
+            case EmbedMode.BottomPin:
+                ForceBottomPin();
+                break;
+
+            default:
+                ForceNormal();
+                break;
         }
-        else
-        {
-            ForceBottomPin();
-        }
+    }
+
+    /// <summary>普通窗口：完全不碰 Progman/WorkerW，桌面整理软件零冲突。</summary>
+    private void ForceNormal()
+    {
+        long style = Win32.GetStyle(_hwnd);
+        Win32.SetStyle(_hwnd, (style & ~Win32.WS_CHILD) | Win32.WS_POPUP);
+        Win32.SetParent(_hwnd, IntPtr.Zero);
+        Mode = EmbedMode.Normal;
+        Win32.SetWindowPos(_hwnd, IntPtr.Zero, 0, 0, 0, 0,
+            Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOZORDER | Win32.SWP_FRAMECHANGED);
+        Win32.ShowWindow(_hwnd, Win32.SW_SHOW);
     }
 
     private void ForceBottomPin()
@@ -100,6 +117,7 @@ internal static class Win32
     public const uint SWP_NOZORDER = 0x4;
     public const uint SWP_FRAMECHANGED = 0x20;
     public const uint SWP_NOACTIVATE = 0x10;
+    public const uint SWP_SHOWWINDOW = 0x40;
 
     public const int WM_NCLBUTTONDOWN = 0xA1;
     public const int HTBOTTOMRIGHT = 17;

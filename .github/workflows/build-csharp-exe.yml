@@ -41,9 +41,9 @@ jobs:
           $out = "../artifacts/release"
           New-Item -ItemType Directory -Force -Path $out | Out-Null
           Copy-Item "bin/Release/net8.0-windows/win-x64/publish/AnimeWidget.exe" "$out/AnimeWidget-csharp-win-x64.exe"
-          Copy-Item "bin/fd/AnimeWidget.exe" "$out/AnimeWidget-csharp-win-x64-fd.exe"
+          Copy-Item "bin/fd/AnimeWidget.exe" "$out/AnimeWidget-csharp-win-x64-needs-dotnet8.exe"
           Compress-Archive -Path "$out/AnimeWidget-csharp-win-x64.exe" -DestinationPath "$out/AnimeWidget-csharp-win-x64.zip" -Force
-          Compress-Archive -Path "$out/AnimeWidget-csharp-win-x64-fd.exe" -DestinationPath "$out/AnimeWidget-csharp-win-x64-fd.zip" -Force
+          Compress-Archive -Path "$out/AnimeWidget-csharp-win-x64-needs-dotnet8.exe" -DestinationPath "$out/AnimeWidget-csharp-win-x64-needs-dotnet8.zip" -Force
           Get-Item "$out/*" | Format-Table Name, Length
 
       - name: Upload artifact

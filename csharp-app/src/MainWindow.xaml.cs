@@ -81,8 +81,15 @@ public partial class MainWindow : Window
         _hwnd = new WindowInteropHelper(this).Handle;
         Win32.EnableAcrylic(_hwnd);
         _layer = new DesktopLayer(_hwnd, _settings.EmbedMode);
+        ApplyTopmost();
         ApplyClickThrough();
         SetupTray();
+    }
+
+    /// <summary>置顶只在普通窗口模式下生效（嵌入桌面层后无意义）。</summary>
+    private void ApplyTopmost()
+    {
+        Topmost = _settings.Topmost && (_layer?.Mode ?? EmbedMode.Normal) == EmbedMode.Normal;
     }
 
     // ---------- 外观 ----------
@@ -219,6 +226,14 @@ public partial class MainWindow : Window
             _settings.Save();
         };
 
+        var miTop = new MenuItem { Header = "置顶（普通窗口模式生效）", IsCheckable = true, IsChecked = _settings.Topmost };
+        miTop.Click += (_, _) =>
+        {
+            _settings.Topmost = miTop.IsChecked;
+            ApplyTopmost();
+            _settings.Save();
+        };
+
         var miAutostart = new MenuItem { Header = "开机自启", IsCheckable = true, IsChecked = GetAutostart() };
         miAutostart.Click += (_, _) => SetAutostart(miAutostart.IsChecked);
 
@@ -254,6 +269,7 @@ public partial class MainWindow : Window
         menu.Items.Add(miShow);
         menu.Items.Add(miThrough);
         menu.Items.Add(miLock);
+        menu.Items.Add(miTop);
         menu.Items.Add(miAutostart);
         menu.Items.Add(miOpacity);
         menu.Items.Add(new Separator());
@@ -364,7 +380,11 @@ public partial class MainWindow : Window
             ApplyAccent();
             ApplyBgDarkness();
         };
-        _settingsWin.EmbedModeChanged += mode => _layer?.SetMode(mode);
+        _settingsWin.EmbedModeChanged += mode =>
+        {
+            _layer?.SetMode(mode);
+            ApplyTopmost();
+        };
         _settingsWin.Closed += (_, _) =>
         {
             _settingsWin = null;
@@ -376,12 +396,36 @@ public partial class MainWindow : Window
 
     // ---------- 窗口行为 ----------
 
+    // 手动拖拽：WorkerW 子窗口没有标题栏，DragMove() 会失效，必须自己算坐标
+    private bool _dragging;
+    private Point _dragOffset;
+
     private void Root_Drag(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton != MouseButton.Left) return;
         if (e.OriginalSource is Button) return;
         if (_settings.Locked) return;
-        try { DragMove(); } catch { }
+        _dragging = true;
+        _dragOffset = e.GetPosition(this);
+        CaptureMouse();
+        e.Handled = true;
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        base.OnMouseMove(e);
+        if (!_dragging || e.LeftButton != MouseButtonState.Pressed) return;
+        var cursor = PointToScreen(e.GetPosition(this));
+        Left = cursor.X - _dragOffset.X;
+        Top = cursor.Y - _dragOffset.Y;
+    }
+
+    protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
+    {
+        base.OnMouseLeftButtonUp(e);
+        if (!_dragging) return;
+        _dragging = false;
+        ReleaseMouseCapture();
         SnapToEdges();
         Persist();
     }

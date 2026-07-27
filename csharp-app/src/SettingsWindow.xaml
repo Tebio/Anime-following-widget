@@ -69,9 +69,10 @@
             <TextBlock Text="桌面嵌入" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DimBrush}"/>
             <Border Background="{StaticResource CardBrush}" CornerRadius="10" Padding="12,10" Margin="0,6,0,12">
                 <StackPanel>
-                    <RadioButton x:Name="EmbedWorkerW" Content="壁纸层（Win+D 不消失）" GroupName="embed"/>
-                    <RadioButton x:Name="EmbedBottomPin" Content="置底窗口（兼容性最好，Win+D 会一起隐藏）" GroupName="embed"/>
-                    <TextBlock Text="壁纸层点不动时切置底窗口，立即生效不用重启" FontSize="10"
+                    <RadioButton x:Name="EmbedNormal" Content="普通窗口（默认，兼容 iTop/酷呆等桌面整理软件）" GroupName="embed"/>
+                    <RadioButton x:Name="EmbedWorkerW" Content="壁纸层（Win+D 不消失，可能与桌面整理软件冲突）" GroupName="embed"/>
+                    <RadioButton x:Name="EmbedBottomPin" Content="置底窗口（普通窗口压最底，Win+D 会一起隐藏）" GroupName="embed"/>
+                    <TextBlock Text="和桌面整理软件冲突/壁纸层点不动时，切回普通窗口即可，立即生效不用重启" FontSize="10"
                                Foreground="{StaticResource DimBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
                 </StackPanel>
             </Border>

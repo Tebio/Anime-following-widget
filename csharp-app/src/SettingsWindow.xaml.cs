@@ -48,8 +48,10 @@ public partial class SettingsWindow : Window
         LockCheck.Unchecked += (_, _) => { settings.Locked = false; settings.Save(); };
 
         // 嵌入
+        EmbedNormal.IsChecked = settings.EmbedMode == EmbedMode.Normal;
         EmbedWorkerW.IsChecked = settings.EmbedMode == EmbedMode.WorkerW;
         EmbedBottomPin.IsChecked = settings.EmbedMode == EmbedMode.BottomPin;
+        EmbedNormal.Checked += (_, _) => SetEmbed(EmbedMode.Normal);
         EmbedWorkerW.Checked += (_, _) => SetEmbed(EmbedMode.WorkerW);
         EmbedBottomPin.Checked += (_, _) => SetEmbed(EmbedMode.BottomPin);
 

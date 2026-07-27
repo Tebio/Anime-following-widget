@@ -40,7 +40,15 @@ public class WeekSchedule
 public enum ClickTarget { Detail, Search }
 
 /// <summary>桌面嵌入方式。</summary>
-public enum EmbedMode { WorkerW, BottomPin }
+public enum EmbedMode
+{
+    /// <summary>普通窗口：不碰 Progman/WorkerW，与 iTop/酷呆等桌面整理软件零冲突。</summary>
+    Normal,
+    /// <summary>挂到壁纸层 WorkerW：Win+D 不消失（可能与桌面整理软件冲突）。</summary>
+    WorkerW,
+    /// <summary>置底窗口：普通窗口压到最底。</summary>
+    BottomPin,
+}
 
 public class AppSettings
 {
@@ -49,11 +57,12 @@ public class AppSettings
     public double BgDarkness { get; set; } = 0.85;
     public bool Locked { get; set; } = false;
     public bool ClickThrough { get; set; } = false;
+    public bool Topmost { get; set; } = false;
     public double? Left { get; set; }
     public double? Top { get; set; }
     public int RefreshMinutes { get; set; } = 30;
     public ClickTarget ClickTarget { get; set; } = ClickTarget.Detail;
-    public EmbedMode EmbedMode { get; set; } = EmbedMode.WorkerW;
+    public EmbedMode EmbedMode { get; set; } = EmbedMode.Normal;
 
     /// <summary>强调色预设（与 Rust 版一致）。</summary>
     public static readonly (string Name, byte R, byte G, byte B)[] Accents =
