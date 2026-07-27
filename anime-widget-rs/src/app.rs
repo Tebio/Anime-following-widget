@@ -336,11 +336,16 @@ impl WidgetApp {
                     self.start_fetch(ctx);
                 }
                 if let Some(sched) = &self.schedule {
+                    let host = sched
+                        .base
+                        .trim_start_matches("https://")
+                        .trim_start_matches("http://");
                     ui.label(
-                        RichText::new(format!("更新于 {}", sched.fetched_at))
+                        RichText::new(format!("更新于 {} · {}", sched.fetched_at, host))
                             .size(10.0)
                             .color(Color32::from_gray(120)),
-                    );
+                    )
+                    .on_hover_text(format!("数据源: {}", sched.base));
                 }
             });
         });
@@ -378,6 +383,11 @@ impl WidgetApp {
             .as_ref()
             .and_then(|s| s.days.get(self.selected_day))
             .map(|d| d.entries.clone());
+        let base = self
+            .schedule
+            .as_ref()
+            .map(|s| s.base.clone())
+            .unwrap_or_else(|| crate::schedule::MIRRORS[0].to_string());
 
         ScrollArea::vertical()
             .auto_shrink([false, false])
@@ -396,13 +406,13 @@ impl WidgetApp {
                 }
                 Some(ref list) => {
                     for entry in list {
-                        self.draw_row(ui, entry, accent);
+                        self.draw_row(ui, entry, accent, &base);
                     }
                 }
             });
     }
 
-    fn draw_row(&mut self, ui: &mut Ui, entry: &Entry, accent: Color32) {
+    fn draw_row(&mut self, ui: &mut Ui, entry: &Entry, accent: Color32, base: &str) {
         let row_h = 24.0;
         let row_w = ui.available_width();
 
@@ -450,7 +460,15 @@ impl WidgetApp {
                     .sense(Sense::click_and_drag())
                     .truncate(),
             );
-            let title = title.on_hover_text(format!("在 AGE 动漫搜索「{}」", entry.title));
+            let hover_tip = match self.settings.click_target {
+                crate::settings::ClickTarget::Detail => {
+                    format!("打开「{}」详情页", entry.title)
+                }
+                crate::settings::ClickTarget::Search => {
+                    format!("在 AGE 动漫搜索「{}」", entry.title)
+                }
+            };
+            let title = title.on_hover_text(hover_tip);
             if title.hovered() {
                 row_ui.ctx().set_cursor_icon(CursorIcon::PointingHand);
                 // hover 下划线
@@ -461,7 +479,11 @@ impl WidgetApp {
                 );
             }
             if title.clicked() {
-                let _ = open::that(entry.search_url());
+                let url = match self.settings.click_target {
+                    crate::settings::ClickTarget::Detail => entry.detail_url_with(base),
+                    crate::settings::ClickTarget::Search => entry.search_url_with(base),
+                };
+                let _ = open::that(url);
             }
             self.handle_drag(row_ui.ctx(), &title);
 
@@ -563,6 +585,30 @@ impl WidgetApp {
                             .on_hover_text(*name);
                         if resp.clicked() {
                             self.settings.accent = i;
+                            self.dirty = true;
+                        }
+                    }
+                });
+
+                ui.add_space(6.0);
+                ui.label("点击番名打开");
+                ui.horizontal(|ui| {
+                    use crate::settings::ClickTarget;
+                    for (target, label, tip) in [
+                        (
+                            ClickTarget::Detail,
+                            "详情页",
+                            "直达该番的 AGE 详情页（推荐）",
+                        ),
+                        (ClickTarget::Search, "搜索页", "打开 AGE 搜索结果页"),
+                    ] {
+                        let selected = self.settings.click_target == target;
+                        if ui
+                            .selectable_label(selected, label)
+                            .on_hover_text(tip)
+                            .clicked()
+                        {
+                            self.settings.click_target = target;
                             self.dirty = true;
                         }
                     }

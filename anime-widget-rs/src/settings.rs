@@ -5,6 +5,21 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+/// 点击番名的行为
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ClickTarget {
+    /// 打开番剧详情页（精确直达，推荐）
+    Detail,
+    /// 打开 AGE 搜索结果页
+    Search,
+}
+
+impl Default for ClickTarget {
+    fn default() -> Self {
+        ClickTarget::Detail
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(default)]
 pub struct Settings {
@@ -22,6 +37,8 @@ pub struct Settings {
     pub pos: Option<(f32, f32)>,
     /// 自动刷新间隔（分钟）
     pub refresh_minutes: u64,
+    /// 点击番名打开详情页还是搜索页
+    pub click_target: ClickTarget,
 }
 
 impl Default for Settings {
@@ -34,6 +51,7 @@ impl Default for Settings {
             click_through: false,
             pos: None,
             refresh_minutes: 30,
+            click_target: ClickTarget::default(),
         }
     }
 }

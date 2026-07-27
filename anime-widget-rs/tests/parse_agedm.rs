@@ -80,3 +80,21 @@ fn search_url_format() {
         .starts_with("https://www.agedm.io/search?query="));
     assert!(!e.search_url().contains(' '));
 }
+
+#[test]
+fn base_recorded_and_mirror_urls() {
+    let s = fixture();
+    assert_eq!(s.base, "https://www.agedm.io");
+    let e = &s.days[6].entries[0];
+    assert_eq!(
+        e.detail_url(),
+        format!("https://www.agedm.io/detail/{}", e.detail_id)
+    );
+    // 镜像 base 替换生效
+    assert!(e
+        .detail_url_with("https://www.age.tv")
+        .starts_with("https://www.age.tv/detail/"));
+    assert!(e
+        .search_url_with("https://www.age.tv")
+        .starts_with("https://www.age.tv/search?query="));
+}

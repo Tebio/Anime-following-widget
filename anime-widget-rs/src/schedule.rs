@@ -13,9 +13,15 @@ use scraper::{Html, Selector};
 pub const AGEDM_HOME: &str = "https://www.agedm.io/";
 pub const AGEDM_SEARCH: &str = "https://www.agedm.io/search?query=";
 
+/// 数据源镜像，按优先级failover（agedm 常年换域名，主站挂了用镜像）
+pub const MIRRORS: [&str; 2] = ["https://www.agedm.io", "https://www.age.tv"];
+
 /// 一周 7 天。index 0=周一 … 6=周日。
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[serde(default)]
 pub struct WeekSchedule {
+    /// 实际抓取成功的镜像 base（拼链接也用它，避免主站挂了点不开）
+    pub base: String,
     pub days: Vec<DaySchedule>,
     /// 抓取成功时间（RFC3339 本地）
     pub fetched_at: String,
@@ -43,19 +49,27 @@ pub struct Entry {
 }
 
 impl Entry {
-    /// 点击标题跳转：AGE 搜索页
+    /// 点击标题跳转：AGE 搜索页（主站）
     pub fn search_url(&self) -> String {
+        self.search_url_with(MIRRORS[0])
+    }
+
+    pub fn search_url_with(&self, base: &str) -> String {
         use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
         format!(
-            "{}{}",
-            AGEDM_SEARCH,
+            "{}/search?query={}",
+            base.trim_end_matches('/'),
             utf8_percent_encode(&self.title, NON_ALPHANUMERIC)
         )
     }
 
-    /// AGE 详情页（备用）
+    /// AGE 详情页（主站）
     pub fn detail_url(&self) -> String {
-        format!("https://www.agedm.io/detail/{}", self.detail_id)
+        self.detail_url_with(MIRRORS[0])
+    }
+
+    pub fn detail_url_with(&self, base: &str) -> String {
+        format!("{}/detail/{}", base.trim_end_matches('/'), self.detail_id)
     }
 }
 
@@ -63,6 +77,10 @@ pub const WEEKDAY_NAMES: [&str; 7] = ["周一", "周二", "周三", "周四", "�
 
 /// 解析 agedm 首页 HTML。page pane id: week-1..week-6 = 周一~周六，week-0 = 周日。
 pub fn parse_schedule(html: &str, fetched_at: String) -> WeekSchedule {
+    parse_schedule_with_base(html, fetched_at, MIRRORS[0])
+}
+
+pub fn parse_schedule_with_base(html: &str, fetched_at: String, base: &str) -> WeekSchedule {
     let doc = Html::parse_document(html);
     let mut days = Vec::with_capacity(7);
 
@@ -126,7 +144,11 @@ pub fn parse_schedule(html: &str, fetched_at: String) -> WeekSchedule {
         days.push(DaySchedule { weekday, entries });
     }
 
-    WeekSchedule { days, fetched_at }
+    WeekSchedule {
+        base: base.trim_end_matches('/').to_string(),
+        days,
+        fetched_at,
+    }
 }
 
 /// "23:00 第04集" -> (Some("23:00"), "第04集")；"第11集(完结)" -> (None, ...)
@@ -149,14 +171,32 @@ fn is_hhmm(s: &str) -> bool {
         && parts.iter().all(|p| p.chars().all(|c| c.is_ascii_digit()))
 }
 
-/// 抓取 agedm 首页并解析（阻塞，放后台线程用）。
+/// 抓取周表：按 MIRRORS 顺序 failover，第一个解析出数据的镜像胜出（阻塞，放后台线程用）。
 pub fn fetch_schedule() -> Result<WeekSchedule, String> {
     let agent = ureq::AgentBuilder::new()
-        .timeout_connect(std::time::Duration::from_secs(10))
-        .timeout_read(std::time::Duration::from_secs(20))
+        .timeout_connect(std::time::Duration::from_secs(8))
+        .timeout_read(std::time::Duration::from_secs(15))
         .build();
+    let mut last_err = String::new();
+    for base in MIRRORS {
+        match fetch_one(&agent, base) {
+            Ok(sched) => return Ok(sched),
+            Err(e) => {
+                log_warn(&format!("镜像 {base} 失败: {e}"));
+                last_err = e;
+            }
+        }
+    }
+    Err(format!("全部镜像不可用（最后错误: {last_err}）"))
+}
+
+fn log_warn(msg: &str) {
+    eprintln!("[anime-widget] {msg}");
+}
+
+fn fetch_one(agent: &ureq::Agent, base: &str) -> Result<WeekSchedule, String> {
     let resp = agent
-        .get(AGEDM_HOME)
+        .get(base)
         .set(
             "User-Agent",
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 \
@@ -167,7 +207,7 @@ pub fn fetch_schedule() -> Result<WeekSchedule, String> {
         .map_err(|e| format!("请求失败: {e}"))?;
     let html = resp.into_string().map_err(|e| format!("读取失败: {e}"))?;
     let fetched_at = chrono::Local::now().format("%Y-%m-%d %H:%M").to_string();
-    let sched = parse_schedule(&html, fetched_at);
+    let sched = parse_schedule_with_base(&html, fetched_at, base);
     if sched.days.iter().all(|d| d.entries.is_empty()) {
         return Err("解析结果为空（页面结构可能已变更）".into());
     }
