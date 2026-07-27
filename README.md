@@ -9,7 +9,7 @@ Windows 桌面追番小组件。**v2.0 Rust 完全重写**：单文件 EXE、免
 `csharp-app/` — .NET 8 + WPF 单文件 exe，与 ashare-mainline-watch 同一套桌面底座：
 MVVM 数据绑定、亚克力圆角暗色卡片、周几 pill tabs（今日标记 + 5 种强调色）、
 WorkerW 壁纸层 / 置底窗口双模式运行时切换、系统代理自动检测（注册表 + env）、
-双镜像 failover、离线缓存、托盘 + 开机自启 + 开机自启、设置窗实时生效。
+双镜像 failover、离线缓存、托盘全功能 + 开机自启、设置窗实时生效。
 
 Release 双产物：自包含 ~65MB（免运行时）/ framework-dependent ~0.5MB（需 .NET 8 运行时）。
 
