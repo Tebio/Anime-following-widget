@@ -570,31 +570,43 @@ public partial class MainWindow : Window
 
     // ---------- 窗口行为 ----------
 
-    // 手动拖拽：WorkerW 子窗口没有标题栏，DragMove() 会失效，必须自己算坐标
+    // 手动拖拽：WorkerW 子窗口没有标题栏，DragMove() 会失效，必须自己算坐标。
+    // ⚠️ 不能在 MouseDown 就 CaptureMouse——捕获会把后续鼠标事件全部重定向到窗口，
+    // 星期 tab / 错误横幅这类 Border 的 MouseLeftButtonUp 永远收不到（点击被吞）。
+    // 改为「按下记位，移动超 4px 才捕获并开始拖拽」：原地松手 = 正常点击，事件照常路由。
     private bool _dragging;
+    private bool _dragPending;
     private Point _dragOffset;
+    private Point _dragStart; // 按下时的屏幕坐标
 
     private void Root_Drag(object sender, MouseButtonEventArgs e)
     {
         if (e.ChangedButton != MouseButton.Left) return;
         if (e.OriginalSource is Button) return;
         if (_settings.Locked) return;
-        _dragging = true;
+        _dragPending = true;
         _dragOffset = e.GetPosition(this);
-        CaptureMouse();
-        e.Handled = true;
+        _dragStart = PointToScreen(_dragOffset);
+        // 不捕获、不 Handled：原地松手时 tab 等子元素能正常收到 MouseLeftButtonUp
     }
 
     protected override void OnMouseMove(MouseEventArgs e)
     {
         base.OnMouseMove(e);
-        if (e.LeftButton != MouseButtonState.Pressed) return;
+        if (e.LeftButton != MouseButtonState.Pressed) { _dragPending = false; return; }
         var cursor = PointToScreen(e.GetPosition(this));
         if (_resizing)
         {
             Width = Math.Max(MinWidth, _resizeW + cursor.X - _resizeOrigin.X);
             Height = Math.Max(MinHeight, _resizeH + cursor.Y - _resizeOrigin.Y);
             return;
+        }
+        if (_dragPending)
+        {
+            if (Math.Abs(cursor.X - _dragStart.X) < 4 && Math.Abs(cursor.Y - _dragStart.Y) < 4) return;
+            _dragPending = false;
+            _dragging = true;
+            CaptureMouse(); // 确认是拖拽后才捕获，此时点击判定已结束
         }
         if (!_dragging) return;
         Left = cursor.X - _dragOffset.X;
@@ -604,6 +616,7 @@ public partial class MainWindow : Window
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonUp(e);
+        _dragPending = false;
         if (_resizing)
         {
             _resizing = false;
