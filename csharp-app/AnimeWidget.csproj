@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AnimeWidget</RootNamespace>
+    <AssemblyName>AnimeWidget</AssemblyName>
+    <Version>3.0.0</Version>
+    <Description>追番桌面卡片 — AGE 动漫周表（C# WPF 版）</Description>
+
+    <!-- 单文件发布 -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>true</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="HtmlAgilityPack" Version="1.11.74" />
+    <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="2.0.1" />
+  </ItemGroup>
+
+  <!-- App.xaml 在 src/ 下，显式声明为应用入口 -->
+  <ItemGroup>
+    <ApplicationDefinition Include="src\App.xaml" />
+  </ItemGroup>
+
+</Project>

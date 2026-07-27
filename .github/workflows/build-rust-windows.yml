@@ -18,7 +18,9 @@ on:
       - "anime-widget-rs/**"
       - ".github/workflows/build-rust-windows.yml"
     tags:
-      - "v*"
+      # Rust 旧版只对 v1/v2 标签构建；v3+ 由 build-csharp-exe.yml 负责
+      - "v1.*"
+      - "v2.*"
 
 permissions:
   contents: write
