@@ -25,7 +25,8 @@
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Bd" Background="Transparent" CornerRadius="9"
-                                Padding="10,7" Margin="0,1">
+                                Padding="10,7" Margin="0,1"
+                                Opacity="{Binding RowOpacity}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*"/>

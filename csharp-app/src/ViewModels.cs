@@ -23,12 +23,15 @@ public class EntryViewModel
 {
     public required Entry Model { get; init; }
     public required string BaseUrl { get; init; }
+    /// <summary>今日条目且播出时间已过 → 置灰。</summary>
+    public bool IsPast { get; init; }
 
     public string Title => Model.Title;
     public bool IsNew => Model.IsNew;
     public bool IsEnd => Model.IsEnd;
     public string TimeText => Model.Time ?? "";
     public string LabelText => Model.Label;
+    public double RowOpacity => IsPast ? 0.45 : 1.0;
 
     public string Url(ClickTarget target) =>
         target == ClickTarget.Detail ? Model.DetailUrl(BaseUrl) : Model.SearchUrl(BaseUrl);
@@ -68,6 +71,12 @@ public class AppViewModel : ObservableBase
         Subtitle = $"{DateTime.Now:M月d日} {ScheduleService.WeekdayNames[TodayIndex]}"
             + (today != null ? $" · 今日 {today.Entries.Count} 部更新" : "");
         SourceText = $"更新于 {sched.FetchedAt} · {new Uri(sched.Base).Host}";
+        // 陈旧缓存提示：抓取时间距今超 36 小时（多为上周缓存）
+        if (DateTime.TryParseExact(sched.FetchedAt, "yyyy-MM-dd HH:mm",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var fetched)
+            && DateTime.Now - fetched > TimeSpan.FromHours(36))
+            SourceText += "（缓存较旧）";
         ErrorText = null;
         RefreshEntries();
     }
@@ -89,8 +98,15 @@ public class AppViewModel : ObservableBase
         Entries.Clear();
         var day = _sched?.Days.ElementAtOrDefault(SelectedDay);
         if (day == null) return;
+        var isToday = SelectedDay == TodayIndex;
+        var now = DateTime.Now.TimeOfDay;
         foreach (var e in day.Entries)
-            Entries.Add(new EntryViewModel { Model = e, BaseUrl = _sched!.Base });
+        {
+            var isPast = isToday
+                && TimeSpan.TryParseExact(e.Time, "hh\\:mm", null, out var t)
+                && t < now;
+            Entries.Add(new EntryViewModel { Model = e, BaseUrl = _sched!.Base, IsPast = isPast });
+        }
         DayChanged?.Invoke();
     }
 

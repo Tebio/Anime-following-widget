@@ -210,6 +210,8 @@ public partial class MainWindow : Window
 
     // ---------- 托盘 ----------
 
+    private MenuItem? _miThrough, _miLock, _miTop, _miOpacity;
+
     private void SetupTray()
     {
         var menu = new ContextMenu();
@@ -263,6 +265,11 @@ public partial class MainWindow : Window
             miOpacity.Items.Add(item);
         }
 
+        _miThrough = miThrough;
+        _miLock = miLock;
+        _miTop = miTop;
+        _miOpacity = miOpacity;
+
         var miRefresh = new MenuItem { Header = "立即刷新" };
         miRefresh.Click += (_, _) => _sched.RefreshNow();
 
@@ -291,6 +298,18 @@ public partial class MainWindow : Window
             ContextMenu = menu,
         };
         _tray.TrayMouseDoubleClick += (_, _) => ToggleVisibility();
+    }
+
+    /// <summary>托盘勾选态与设置窗双向同步（设置窗关闭时调用）。</summary>
+    private void SyncTrayChecks()
+    {
+        if (_miThrough != null) _miThrough.IsChecked = _settings.ClickThrough;
+        if (_miLock != null) _miLock.IsChecked = _settings.Locked;
+        if (_miTop != null) _miTop.IsChecked = _settings.Topmost;
+        if (_miOpacity != null)
+            foreach (var item in _miOpacity.Items.OfType<MenuItem>())
+                item.IsChecked = Math.Abs(_settings.WindowOpacity * 100
+                    - int.Parse(item.Header.ToString()!.TrimEnd('%'))) < 1;
     }
 
     private void ToggleVisibility()
@@ -395,6 +414,7 @@ public partial class MainWindow : Window
         {
             _settingsWin = null;
             ApplyClickThrough();
+            SyncTrayChecks(); // 托盘勾选态跟上设置窗改动
             _settings.Save();
         };
         _settingsWin.Show();
