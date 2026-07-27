@@ -42,6 +42,7 @@ public partial class MainWindow : Window
         }
         if (_settings.Width.HasValue) Width = _settings.Width.Value;
         if (_settings.Height.HasValue) Height = _settings.Height.Value;
+        EnsureOnScreen();
         Opacity = _settings.WindowOpacity;
 
         ApplyAccent();
@@ -199,6 +200,21 @@ public partial class MainWindow : Window
     }
 
     // ---------- 外观 ----------
+
+    /// <summary>还原位置若大半落在可视区域外（拔掉副屏等），拉回主屏默认位，防「小组件消失找不到」。</summary>
+    private void EnsureOnScreen()
+    {
+        var vs = new Rect(SystemParameters.VirtualScreenLeft, SystemParameters.VirtualScreenTop,
+            SystemParameters.VirtualScreenWidth, SystemParameters.VirtualScreenHeight);
+        var win = new Rect(Left, Top, Width, Height);
+        var visible = Rect.Intersect(vs, win);
+        if (visible.IsEmpty || visible.Width * visible.Height < win.Width * win.Height / 4)
+        {
+            var wa = SystemParameters.WorkArea;
+            Left = wa.Right - Width - 24;
+            Top = wa.Top + 80;
+        }
+    }
 
     private void ApplyAccent()
     {
