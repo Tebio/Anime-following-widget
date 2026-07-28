@@ -40,8 +40,8 @@
             </Setter>
         </Style>
 
-        <!-- 圆头滑杆 -->
-        <Style TargetType="Thumb">
+        <!-- 圆头滑杆 Thumb 模板（按滑杆局部引用，别全局——会污染滚动条） -->
+        <Style x:Key="RoundThumb" TargetType="Thumb">
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Thumb">
@@ -103,18 +103,37 @@
                         <TextBlock x:Name="OpacityValue" FontSize="11.5" FontWeight="SemiBold"
                                    Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Right"/>
                     </Grid>
-                    <Slider x:Name="OpacitySlider" Minimum="0.1" Maximum="1.0"
-                            Margin="0,6,0,10" ValueChanged="Opacity_Changed"/>
+                    <!-- IsMoveToPointEnabled=True 是"只有两个档"的根治：
+                         默认 False 时点轨道按 LargeChange(=1.0) 步进，
+                         跨度只有 0.9 → 点哪都撞 min/max，正好两档 -->
+                    <Slider x:Name="OpacitySlider" Minimum="0.1" Maximum="1.0" IsMoveToPointEnabled="True"
+                            Margin="0,6,0,2" ValueChanged="Opacity_Changed">
+                        <Slider.Resources>
+                            <Style TargetType="Thumb" BasedOn="{StaticResource RoundThumb}"/>
+                        </Slider.Resources>
+                    </Slider>
+                    <TextBlock Text="面板有多透；文字始终清晰，不随透明度变淡" FontSize="10"
+                               Foreground="{StaticResource DimBrush}" Margin="0,0,0,10"/>
                     <Grid>
                         <TextBlock Text="背景深浅" FontSize="12" VerticalAlignment="Center"/>
                         <TextBlock x:Name="DarknessValue" FontSize="11.5" FontWeight="SemiBold"
                                    Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Right"/>
                     </Grid>
-                    <Slider x:Name="DarknessSlider" Minimum="0" Maximum="1.0"
-                            Margin="0,6,0,6" ValueChanged="Darkness_Changed"/>
+                    <Slider x:Name="DarknessSlider" Minimum="0" Maximum="1.0" IsMoveToPointEnabled="True"
+                            Margin="0,6,0,2" ValueChanged="Darkness_Changed">
+                        <Slider.Resources>
+                            <Style TargetType="Thumb" BasedOn="{StaticResource RoundThumb}"/>
+                        </Slider.Resources>
+                    </Slider>
+                    <TextBlock Text="面板颜色：浅蓝灰 ↔ 深黑" FontSize="10"
+                               Foreground="{StaticResource DimBrush}" Margin="0,0,0,8"/>
                     <CheckBox x:Name="BlurCheck" Style="{StaticResource Switch}" Content="磨砂背景（系统亚克力模糊）"/>
+                    <TextBlock Text="打开后壁纸模糊透出；Win11 部分版本系统不支持属正常" FontSize="10"
+                               Foreground="{StaticResource DimBrush}" Margin="43,0,0,6"/>
                     <TextBlock Text="强调色" FontSize="12" Margin="0,8,0,6"/>
                     <StackPanel x:Name="AccentPanel" Orientation="Horizontal"/>
+                    <TextBlock Text="高亮颜色：今天、收藏星、按钮" FontSize="10"
+                               Foreground="{StaticResource DimBrush}" Margin="0,4,0,0"/>
                 </StackPanel>
             </Border>
 
@@ -123,15 +142,25 @@
             <Border Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12" Margin="0,6,0,12">
                 <StackPanel>
                     <TextBlock Text="点击番名打开" FontSize="12" Margin="0,0,0,6"/>
-                    <StackPanel x:Name="ClickPills" Orientation="Horizontal" Margin="0,0,0,10"/>
-                    <Grid Margin="0,0,0,6">
-                        <TextBlock Text="自动刷新间隔" FontSize="12" VerticalAlignment="Center"/>
-                    </Grid>
-                    <StackPanel x:Name="RefreshPills" Orientation="Horizontal" Margin="0,0,0,8"/>
+                    <StackPanel x:Name="ClickPills" Orientation="Horizontal" Margin="0,0,0,2"/>
+                    <TextBlock Text="点番名时跳转到哪个页面" FontSize="10"
+                               Foreground="{StaticResource DimBrush}" Margin="0,0,0,10"/>
+                    <TextBlock Text="自动刷新间隔" FontSize="12" Margin="0,0,0,6"/>
+                    <StackPanel x:Name="RefreshPills" Orientation="Horizontal" Margin="0,0,0,2"/>
+                    <TextBlock Text="多久自动拉取一次最新放送数据" FontSize="10"
+                               Foreground="{StaticResource DimBrush}" Margin="0,0,0,8"/>
                     <CheckBox x:Name="ThroughCheck" Style="{StaticResource Switch}" Content="鼠标穿透（点击穿过卡片）"/>
+                    <TextBlock Text="开启后点击直达桌面；想恢复：右键托盘图标里关闭" FontSize="10"
+                               Foreground="{StaticResource DimBrush}" Margin="43,0,0,4"/>
                     <CheckBox x:Name="LockCheck" Style="{StaticResource Switch}" Content="锁定位置（禁止拖拽）"/>
+                    <TextBlock Text="锁住后卡片不能拖动、不能拉伸" FontSize="10"
+                               Foreground="{StaticResource DimBrush}" Margin="43,0,0,4"/>
                     <CheckBox x:Name="NotifyCheck" Style="{StaticResource Switch}" Content="更新提醒（收藏的番到点通知）"/>
+                    <TextBlock Text="收藏的番到播出时间，右下角弹气泡提醒" FontSize="10"
+                               Foreground="{StaticResource DimBrush}" Margin="43,0,0,4"/>
                     <CheckBox x:Name="FavOnlyCheck" Style="{StaticResource Switch}" Content="只显示收藏的番"/>
+                    <TextBlock Text="列表只保留点过★的那几部" FontSize="10"
+                               Foreground="{StaticResource DimBrush}" Margin="43,0,0,4"/>
                 </StackPanel>
             </Border>
 
