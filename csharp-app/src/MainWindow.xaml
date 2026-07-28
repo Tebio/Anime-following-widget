@@ -154,9 +154,11 @@
                 </StackPanel>
             </Border>
 
-            <!-- 周几 pills -->
-            <StackPanel Grid.Row="2" x:Name="TabPanel" Orientation="Horizontal"
-                        Margin="11,7,10,3"/>
+            <!-- 周几 pills（窗口变窄时可横向滚动，滚轮=横滚） -->
+            <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                          Margin="11,7,10,3" PreviewMouseWheel="TabScroll_Wheel">
+                <StackPanel x:Name="TabPanel" Orientation="Horizontal"/>
+            </ScrollViewer>
 
             <!-- 列表 -->
             <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto" Margin="6,1,6,4">

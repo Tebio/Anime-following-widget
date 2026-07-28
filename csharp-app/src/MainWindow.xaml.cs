@@ -43,7 +43,9 @@ public partial class MainWindow : Window
         if (_settings.Width.HasValue) Width = _settings.Width.Value;
         if (_settings.Height.HasValue) Height = _settings.Height.Value;
         EnsureOnScreen();
-        Opacity = _settings.WindowOpacity;
+        // 不再把 WindowOpacity 应用到整窗 Opacity（文字会跟着发灰）——
+        // 通透感 = 背景半透 + 文字 100% 不透明，由 ApplyBgDarkness 折进背景 alpha。
+        Opacity = 1.0;
 
         ApplyAccent();
         ApplyBgDarkness();
@@ -130,6 +132,7 @@ public partial class MainWindow : Window
         base.OnSourceInitialized(e);
         _hwnd = new WindowInteropHelper(this).Handle;
         Win32.EnableAcrylic(_hwnd);
+        HwndSource.FromHwnd(_hwnd)?.AddHook(WndProc); // 四边/四角原生拉伸 + 缩放结束持久化
         // 整理软件在运行时不挂 WorkerW（会被它们的桌面表面盖住/随父层隐藏消失）
         var want = _settings.EmbedMode;
         bool blocked = want == EmbedMode.WorkerW && OrganizerDetect.AnyRunning();
@@ -229,10 +232,11 @@ public partial class MainWindow : Window
     private void ApplyBgDarkness()
     {
         // bg_darkness 0(通透磨砂)~1(深沉)：alpha 从 0x40 到 0x100，
-        // 默认 0.6 附近时卡片半透，底层亚克力磨砂透出来
+        // 默认 0.6 附近时卡片半透，底层亚克力磨砂透出来。
+        // WindowOpacity 折进背景 alpha（不动整窗 Opacity，文字保持锐利）。
         var d = Math.Clamp(_settings.BgDarkness, 0, 1);
         var v = (byte)(28 - d * 14);              // 28(亮灰黑) → 14(近黑)
-        var a = (byte)Math.Min(255, 0x40 + d * 0xC0);
+        var a = (byte)Math.Min(255, (0x40 + d * 0xC0) * Math.Clamp(_settings.WindowOpacity, 0.2, 1));
         RootBorder.Background = new SolidColorBrush(Color.FromArgb(a, v, (byte)(v + 2), (byte)(v + 8)));
     }
 
@@ -538,9 +542,8 @@ public partial class MainWindow : Window
         };
         _settingsWin.AppearanceChanged += () =>
         {
-            Opacity = _settings.WindowOpacity;
             ApplyAccent();
-            ApplyBgDarkness();
+            ApplyBgDarkness(); // WindowOpacity 已在背景 alpha 里生效，整窗 Opacity 恒为 1
         };
         _settingsWin.EmbedModeChanged += mode =>
         {
@@ -577,7 +580,8 @@ public partial class MainWindow : Window
     private bool _dragging;
     private bool _dragPending;
     private Point _dragOffset;
-    private Point _dragStart; // 按下时的屏幕坐标
+    private Point _dragStart; // 按下时的屏幕坐标（物理像素）
+    private double _dragLogicalX, _dragLogicalY; // 拖拽中的目标逻辑坐标（松手才回写 DP）
 
     private void Root_Drag(object sender, MouseButtonEventArgs e)
     {
@@ -594,23 +598,35 @@ public partial class MainWindow : Window
     {
         base.OnMouseMove(e);
         if (e.LeftButton != MouseButtonState.Pressed) { _dragPending = false; return; }
-        var cursor = PointToScreen(e.GetPosition(this));
+        // 直接读屏幕物理坐标：窗口移动中 PointToScreen(e.GetPosition(this)) 的
+        // 坐标原点跟着窗口走，会形成反馈环——这就是拖拽不跟手的根因。
+        Win32.GetCursorPos(out var cur);
+        var dpi = VisualTreeHelper.GetDpi(this);
+        double sx = dpi.DpiScaleX, sy = dpi.DpiScaleY;
         if (_resizing)
         {
-            Width = Math.Max(MinWidth, _resizeW + cursor.X - _resizeOrigin.X);
-            Height = Math.Max(MinHeight, _resizeH + cursor.Y - _resizeOrigin.Y);
+            double w = Math.Max(MinWidth, _resizeW + (cur.X - _resizeOrigin.X) / sx);
+            double h = Math.Max(MinHeight, _resizeH + (cur.Y - _resizeOrigin.Y) / sy);
+            _resizeTargetW = w; _resizeTargetH = h;
+            Win32.SetWindowPos(_hwnd, IntPtr.Zero, 0, 0,
+                (int)Math.Round(w * sx), (int)Math.Round(h * sy),
+                Win32.SWP_NOMOVE | Win32.SWP_NOZORDER | Win32.SWP_NOACTIVATE);
             return;
         }
         if (_dragPending)
         {
-            if (Math.Abs(cursor.X - _dragStart.X) < 4 && Math.Abs(cursor.Y - _dragStart.Y) < 4) return;
+            if (Math.Abs(cur.X - _dragStart.X) < 4 && Math.Abs(cur.Y - _dragStart.Y) < 4) return;
             _dragPending = false;
             _dragging = true;
             CaptureMouse(); // 确认是拖拽后才捕获，此时点击判定已结束
         }
         if (!_dragging) return;
-        Left = cursor.X - _dragOffset.X;
-        Top = cursor.Y - _dragOffset.Y;
+        _dragLogicalX = cur.X / sx - _dragOffset.X;
+        _dragLogicalY = cur.Y / sy - _dragOffset.Y;
+        // 直移 hwnd 不等 WPF 布局——松手时再回写 Left/Top DP。
+        Win32.SetWindowPos(_hwnd, IntPtr.Zero,
+            (int)Math.Round(_dragLogicalX * sx), (int)Math.Round(_dragLogicalY * sy), 0, 0,
+            Win32.SWP_NOSIZE | Win32.SWP_NOZORDER | Win32.SWP_NOACTIVATE);
     }
 
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
@@ -621,18 +637,75 @@ public partial class MainWindow : Window
         {
             _resizing = false;
             ReleaseMouseCapture();
+            Width = _resizeTargetW; Height = _resizeTargetH; // 回写 DP（视觉无跳变）
             Persist();
             return;
         }
         if (!_dragging) return;
         _dragging = false;
         ReleaseMouseCapture();
+        Left = _dragLogicalX; Top = _dragLogicalY; // 回写 DP 后吸附/持久化才有正确基准
         SnapToEdges();
         Persist();
     }
 
     private const double SnapDist = 20;
     private const double EdgeMargin = 8;
+
+    // ---------- 四边/四角原生拉伸（Normal/BottomPin 模式） ----------
+    // 无边框窗口默认全窗 HTCLIENT；命中边缘 7px 带时改报 HT* 方向码，
+    // Windows 接管模态缩放循环——手感与原生窗口一致，且上下左右四角全支持。
+    // WorkerW 子窗口的非客户消息不可靠，该模式仍用右下角手柄（Grip_Resize）。
+    private const int WM_NCHITTEST = 0x0084;
+    private const int WM_EXITSIZEMOVE = 0x0232;
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (msg == WM_EXITSIZEMOVE)
+        {
+            Persist(); // 原生缩放/移动结束 → 尺寸位置落盘
+            return IntPtr.Zero;
+        }
+        if (msg != WM_NCHITTEST) return IntPtr.Zero;
+        if (_settings.Locked || _settings.ClickThrough) return IntPtr.Zero;
+        if ((_layer?.Mode ?? EmbedMode.Normal) == EmbedMode.WorkerW) return IntPtr.Zero;
+
+        // lParam = 屏幕坐标（物理像素，有符号 short 对）
+        long lp = lParam.ToInt64();
+        int x = unchecked((short)(lp & 0xFFFF));
+        int y = unchecked((short)((lp >> 16) & 0xFFFF));
+        Win32.GetWindowRect(hwnd, out var r);
+        var dpi = VisualTreeHelper.GetDpi(this);
+        int grip = Math.Max(4, (int)Math.Round(7 * dpi.DpiScaleX));
+
+        bool left = x - r.Left >= 0 && x - r.Left < grip;
+        bool right = r.Right - x > 0 && r.Right - x <= grip;
+        bool top = y - r.Top >= 0 && y - r.Top < grip;
+        bool bottom = r.Bottom - y > 0 && r.Bottom - y <= grip;
+
+        int ht = 0;
+        if (top && left) ht = 13;            // HTTOPLEFT
+        else if (top && right) ht = 14;      // HTTOPRIGHT
+        else if (bottom && left) ht = 16;    // HTBOTTOMLEFT
+        else if (bottom && right) ht = 17;   // HTBOTTOMRIGHT
+        else if (left) ht = 10;              // HTLEFT
+        else if (right) ht = 11;             // HTRIGHT
+        else if (top) ht = 12;               // HTTOP
+        else if (bottom) ht = 15;            // HTBOTTOM
+        if (ht == 0) return IntPtr.Zero;
+        handled = true;
+        return new IntPtr(ht);
+    }
+
+    /// <summary>周几 tab 条：滚轮 = 横向滚动。</summary>
+    private void TabScroll_Wheel(object sender, MouseWheelEventArgs e)
+    {
+        if (sender is ScrollViewer sv)
+        {
+            sv.ScrollToHorizontalOffset(sv.HorizontalOffset - e.Delta / 3.0);
+            e.Handled = true;
+        }
+    }
 
     private void SnapToEdges()
     {
@@ -647,6 +720,7 @@ public partial class MainWindow : Window
     private bool _resizing;
     private Point _resizeOrigin;
     private double _resizeW, _resizeH;
+    private double _resizeTargetW, _resizeTargetH; // 缩放中的目标逻辑尺寸（松手回写 DP）
 
     private void Grip_Resize(object sender, MouseButtonEventArgs e)
     {
