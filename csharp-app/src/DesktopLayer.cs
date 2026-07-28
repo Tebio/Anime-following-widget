@@ -227,7 +227,9 @@ internal static class Win32
             {
                 AccentState = 4,
                 AccentFlags = 2,
-                GradientColor = unchecked((int)0xB01E1410), // ABGR：alpha 0xB0(69%) + 深青灰 tint，磨砂感拉满
+                // 低 tint 高模糊：模糊负责可读性，底色交给 WPF 面板——
+                // 之前 0xB0(69%) 黑 tint + 面板 alpha 双重压暗 = 塑料板泥灰感
+                GradientColor = unchecked((int)0x381E1410), // ABGR：alpha 0x38(22%) 轻 tint
                 AnimationId = 0,
             };
             int size = Marshal.SizeOf(accent);

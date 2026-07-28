@@ -231,12 +231,13 @@ public partial class MainWindow : Window
 
     private void ApplyBgDarkness()
     {
-        // bg_darkness 0(通透磨砂)~1(深沉)：alpha 从 0x40 到 0x100，
-        // 默认 0.6 附近时卡片半透，底层亚克力磨砂透出来。
+        // bg_darkness 0(通透磨砂)~1(深沉)：v3.9.1 材质重做——
+        // 高模糊(亚克力) + 低面板 alpha + 文字阴影 = 商业挂件通透感。
+        // alpha 从 0x18(d=0, 几乎纯磨砂) 到 0xC0(d=1, 深沉玻璃)，默认 0.55 ≈ 45%。
         // WindowOpacity 折进背景 alpha（不动整窗 Opacity，文字保持锐利）。
         var d = Math.Clamp(_settings.BgDarkness, 0, 1);
         var v = (byte)(28 - d * 14);              // 28(亮灰黑) → 14(近黑)
-        var a = (byte)Math.Min(255, (0x40 + d * 0xC0) * Math.Clamp(_settings.WindowOpacity, 0.2, 1));
+        var a = (byte)Math.Min(255, (0x18 + d * 0xA8) * Math.Clamp(_settings.WindowOpacity, 0.2, 1));
         RootBorder.Background = new SolidColorBrush(Color.FromArgb(a, v, (byte)(v + 2), (byte)(v + 8)));
     }
 
@@ -258,7 +259,12 @@ public partial class MainWindow : Window
                 Tag = idx,
             };
             var sp = new StackPanel { Orientation = Orientation.Horizontal };
-            var txt = new TextBlock { Text = ScheduleService.WeekdayNames[i], FontSize = 12 };
+            var txt = new TextBlock
+            {
+                Text = ScheduleService.WeekdayNames[i],
+                FontSize = 12,
+                Effect = (System.Windows.Media.Effects.Effect)FindResource("TextShadow"),
+            };
             sp.Children.Add(txt);
             if (isToday)
             {

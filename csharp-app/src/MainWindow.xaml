@@ -17,6 +17,10 @@
         <SolidColorBrush x:Key="NewBrush" Color="#F04848"/>
         <SolidColorBrush x:Key="EndBrush" Color="#E88BB0"/>
 
+        <!-- 文字阴影：把字从杂乱壁纸里"抠"出来——商业桌面挂件通透感的核心 -->
+        <DropShadowEffect x:Key="TextShadow" BlurRadius="6" ShadowDepth="0" Direction="270"
+                          Color="#000000" Opacity="0.62" RenderingBias="Quality"/>
+
         <!-- 番剧条目行 -->
         <DataTemplate x:Key="EntryTemplate" DataType="local:EntryViewModel">
             <Button Cursor="Hand" Background="Transparent" BorderThickness="0"
@@ -36,7 +40,9 @@
 
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                     <TextBlock x:Name="TitleText" Text="{Binding Title}" FontSize="12.5"
+                                               FontWeight="Medium"
                                                Foreground="{StaticResource FgBrush}"
+                                               Effect="{StaticResource TextShadow}"
                                                TextTrimming="CharacterEllipsis" MaxWidth="185"
                                                VerticalAlignment="Center"/>
                                     <TextBlock Text="New!" FontSize="9.5" FontStyle="Italic" FontWeight="Bold"
@@ -49,8 +55,10 @@
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
                                             Visibility="{Binding IsEnd, Converter={x:Static local:BoolVisConverter.Instance}, ConverterParameter=invert}">
                                     <TextBlock Text="{Binding TimeText}" FontSize="11"
-                                               Foreground="#B9BDC9" Margin="0,0,5,0"/>
+                                               Foreground="#D8DBE3" Effect="{StaticResource TextShadow}"
+                                               Margin="0,0,5,0"/>
                                     <TextBlock Text="{Binding LabelText}" FontSize="10"
+                                               Effect="{StaticResource TextShadow}"
                                                Foreground="{StaticResource SubBrush}"/>
                                 </StackPanel>
                                 <Border Grid.Column="1" CornerRadius="7" Padding="7,2"
@@ -121,7 +129,8 @@
                         <Ellipse x:Name="AccentDot" Width="7" Height="7"
                                  VerticalAlignment="Center" Margin="0,0,7,0"/>
                         <TextBlock Text="本周放送列表" FontSize="14.5" FontWeight="SemiBold"
-                                   Foreground="{StaticResource FgBrush}" VerticalAlignment="Center"/>
+                                   Foreground="{StaticResource FgBrush}" VerticalAlignment="Center"
+                                   Effect="{StaticResource TextShadow}"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <Button Content="&#xE72C;" FontFamily="Segoe Fluent Icons, Segoe MDL2 Assets"
@@ -136,9 +145,9 @@
                     </StackPanel>
                 </Grid>
                 <TextBlock Text="{Binding Subtitle}" FontSize="10" Foreground="{StaticResource DimBrush}"
-                           Margin="0,3,0,0"/>
+                           Effect="{StaticResource TextShadow}" Margin="0,3,0,0"/>
                 <TextBlock Text="{Binding SourceText}" FontSize="9.5" Foreground="{StaticResource DimBrush}"
-                           Margin="0,1.5,0,0" Opacity="0.8"/>
+                           Effect="{StaticResource TextShadow}" Margin="0,1.5,0,0" Opacity="0.8"/>
             </StackPanel>
 
             <!-- 错误横幅（点击重试） -->
@@ -169,7 +178,7 @@
             <!-- 状态栏 + 缩放手柄 -->
             <Grid Grid.Row="4" Margin="13,0,8,7">
                 <TextBlock x:Name="StatusText" FontSize="9.5" Foreground="{StaticResource DimBrush}"
-                           VerticalAlignment="Center"/>
+                           Effect="{StaticResource TextShadow}" VerticalAlignment="Center"/>
                 <Rectangle Width="14" Height="14" HorizontalAlignment="Right" VerticalAlignment="Bottom"
                            Cursor="SizeNWSE" MouseLeftButtonDown="Grip_Resize">
                     <Rectangle.Fill>
