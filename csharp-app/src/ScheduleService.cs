@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http;
+using System.Text.Json;
 using HtmlAgilityPack;
 
 namespace AnimeWidget;
@@ -11,6 +12,8 @@ namespace AnimeWidget;
 public class ScheduleService : IDisposable
 {
     public static readonly string[] Mirrors = { "https://www.agedm.io", "https://www.age.tv" };
+    /// <summary>官方 JSON API（第三方 App 同款）：优先于 HTML 刮取，失败自动回退 Mirrors。</summary>
+    public static readonly string[] ApiMirrors = { "https://api.agedm.io/v2", "https://ageapi.omwjhz.com:18888/v2" };
     public static readonly string[] WeekdayNames = { "周一", "周二", "周三", "周四", "周五", "周六", "周日" };
 
     private string _proxyDesc;
@@ -91,6 +94,33 @@ public class ScheduleService : IDisposable
     {
         using var client = BuildClient(); // 每次重读代理设置
         var errors = new List<string>();
+
+        // 第一梯队：官方 JSON API（干净、带精确更新时间戳）
+        foreach (var apiBase in ApiMirrors)
+        {
+            try
+            {
+                var json = await client.GetStringAsync($"{apiBase}/home-list", ct);
+                var sched = ParseApi(json, apiBase);
+                if (sched.Days.Any(d => d.Entries.Count > 0))
+                {
+                    Current = sched;
+                    LastError = null;
+                    LastOk = DateTime.Now;
+                    AppSettings.SaveCache(sched);
+                    ScheduleUpdated?.Invoke(sched);
+                    StateChanged?.Invoke();
+                    return;
+                }
+                errors.Add($"{apiBase} → 响应无周表数据");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                errors.Add($"{apiBase} → {ex.Message}");
+            }
+        }
+
+        // 第二梯队：HTML 刮取镜像（API 全挂时兜底）
         foreach (var baseUrl in Mirrors)
         {
             try
@@ -116,6 +146,53 @@ public class ScheduleService : IDisposable
         }
         LastError = string.Join("\n", errors);
         StateChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// 解析官方 API /v2/home-list。week_list 键 "1"~"6"=周一~周六，"0"=周日（与 HTML pane id 一致）。
+    /// 条目：{ isnew: 0/1, id: AID, wd, name, mtime: "yyyy-MM-dd HH:mm:ss", namefornew: "00:00 第04集" }
+    /// </summary>
+    public static WeekSchedule ParseApi(string json, string baseUrl)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        var days = new List<DaySchedule>(7);
+        for (var weekday = 0; weekday < 7; weekday++)
+            days.Add(new DaySchedule { Weekday = weekday, Entries = new List<Entry>() });
+
+        if (root.TryGetProperty("week_list", out var weekList))
+        {
+            foreach (var dayProp in weekList.EnumerateObject())
+            {
+                // API 键："1"=周一…"6"=周六，"0"=周日 → 模型：0=周一…6=周日
+                if (!int.TryParse(dayProp.Name, out var wd)) continue;
+                var weekday = wd == 0 ? 6 : wd - 1;
+                var entries = days[weekday].Entries;
+                foreach (var item in dayProp.Value.EnumerateArray())
+                {
+                    var name = item.TryGetProperty("name", out var n) ? n.GetString()?.Trim() : null;
+                    if (string.IsNullOrEmpty(name)) continue;
+                    var subRaw = item.TryGetProperty("namefornew", out var s) ? s.GetString() ?? "" : "";
+                    var (time, label) = SplitTime(subRaw);
+                    entries.Add(new Entry
+                    {
+                        Title = name,
+                        DetailId = item.TryGetProperty("id", out var idEl) ? idEl.ToString() : "",
+                        IsNew = item.TryGetProperty("isnew", out var nw) && nw.ValueKind == JsonValueKind.Number && nw.GetInt32() == 1,
+                        IsEnd = label.Contains("完结"),
+                        Time = time,
+                        Label = label,
+                    });
+                }
+            }
+        }
+
+        return new WeekSchedule
+        {
+            Base = baseUrl.TrimEnd('/'),
+            Days = days,
+            FetchedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm"),
+        };
     }
 
     /// <summary>解析 agedm 首页。pane id: week-1..week-6 = 周一~周六，week-0 = 周日。</summary>
