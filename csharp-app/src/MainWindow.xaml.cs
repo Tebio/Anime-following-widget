@@ -131,7 +131,7 @@ public partial class MainWindow : Window
     {
         base.OnSourceInitialized(e);
         _hwnd = new WindowInteropHelper(this).Handle;
-        Win32.EnableAcrylic(_hwnd);
+        ApplyBlur(); // 磨砂与否由设置决定（默认关）
         HwndSource.FromHwnd(_hwnd)?.AddHook(WndProc); // 四边/四角原生拉伸 + 缩放结束持久化
         // 整理软件在运行时不挂 WorkerW（会被它们的桌面表面盖住/随父层隐藏消失）
         var want = _settings.EmbedMode;
@@ -200,6 +200,10 @@ public partial class MainWindow : Window
     private void ApplyTopmost()
     {
         Topmost = _settings.Topmost && (_layer?.Mode ?? EmbedMode.Normal) == EmbedMode.Normal;
+        // 右下角手动缩放手柄只在 WorkerW 模式出现（该模式原生边缘拉伸不可用）；
+        // 普通/置底模式四边四角直接拖，手柄纯属多余
+        ResizeGrip.Visibility = (_layer?.Mode ?? EmbedMode.Normal) == EmbedMode.WorkerW
+            ? Visibility.Visible : Visibility.Collapsed;
     }
 
     // ---------- 外观 ----------
@@ -231,15 +235,21 @@ public partial class MainWindow : Window
 
     private void ApplyBgDarkness()
     {
-        // bg_darkness 0(通透磨砂)~1(深沉)：v3.9.2 复刻优效材质公式——
-        // 逆向实锤：优效底板=73% 深色纯色块(无模糊)，文字=纯白+粗字重。
-        // ACCENT 亚克力对透明 WPF 窗口静默失效，别指望模糊，底板深度才是主体。
-        // alpha 从 0x30(d=0) 到 0xE8(d=1)，默认 0.55 ≈ 优效同款 73%。
-        // WindowOpacity 折进背景 alpha（不动整窗 Opacity，文字保持锐利）。
+        // v3.9.3 双滑条正交化（用户反馈"两个功能只有两档"= 旧版都混进 alpha，互相冗余）：
+        // 「窗口透明度」= 纯面板 alpha（30% 就是 30% 不透明，所见即所得）
+        // 「背景深浅」  = 纯面板色相（亮蓝灰 → 近黑），不碰 alpha
         var d = Math.Clamp(_settings.BgDarkness, 0, 1);
-        var v = (byte)(40 - d * 24);              // 40(深蓝灰 ~#1F2838) → 16(近黑)
-        var a = (byte)Math.Min(255, (0x30 + d * 0xB8) * Math.Clamp(_settings.WindowOpacity, 0.2, 1));
+        var v = (byte)(40 - d * 24);              // 40(#242838 优效色系) → 16(近黑)
+        var a = (byte)Math.Min(255, 255 * Math.Clamp(_settings.WindowOpacity, 0.08, 1));
         RootBorder.Background = new SolidColorBrush(Color.FromArgb(a, (byte)(v - 4), v, (byte)(v + 16)));
+    }
+
+    /// <summary>磨砂背景开关（用户自选，默认关）。ACCENT 对透明 WPF 窗口多数情况静默失效——聊胜于无。</summary>
+    private void ApplyBlur()
+    {
+        if (_hwnd == IntPtr.Zero) return;
+        if (_settings.BlurEnabled) Win32.EnableAcrylic(_hwnd);
+        else Win32.DisableAcrylic(_hwnd);
     }
 
     // ---------- 周几 tabs（代码构建，accent 感知） ----------
@@ -550,7 +560,8 @@ public partial class MainWindow : Window
         _settingsWin.AppearanceChanged += () =>
         {
             ApplyAccent();
-            ApplyBgDarkness(); // WindowOpacity 已在背景 alpha 里生效，整窗 Opacity 恒为 1
+            ApplyBgDarkness(); // WindowOpacity=纯面板alpha、BgDarkness=纯色相
+            ApplyBlur();       // 磨砂开关即时生效
         };
         _settingsWin.EmbedModeChanged += mode =>
         {

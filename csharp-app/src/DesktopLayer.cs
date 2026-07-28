@@ -219,17 +219,18 @@ internal static class Win32
         public int SizeOfData;
     }
 
-    public static void EnableAcrylic(IntPtr hwnd)
+    public static void EnableAcrylic(IntPtr hwnd) => SetAccent(hwnd, 4, 2, unchecked((int)0x381E1410)); // 22% 轻 tint
+    public static void DisableAcrylic(IntPtr hwnd) => SetAccent(hwnd, 0, 0, 0); // ACCENT_DISABLED
+
+    private static void SetAccent(IntPtr hwnd, int state, int flags, int gradientColor)
     {
         try
         {
             var accent = new AccentPolicy
             {
-                AccentState = 4,
-                AccentFlags = 2,
-                // 低 tint 高模糊：模糊负责可读性，底色交给 WPF 面板——
-                // 之前 0xB0(69%) 黑 tint + 面板 alpha 双重压暗 = 塑料板泥灰感
-                GradientColor = unchecked((int)0x381E1410), // ABGR：alpha 0x38(22%) 轻 tint
+                AccentState = state,
+                AccentFlags = flags,
+                GradientColor = gradientColor,
                 AnimationId = 0,
             };
             int size = Marshal.SizeOf(accent);

@@ -26,6 +26,9 @@ public partial class SettingsWindow : Window
         // 外观
         OpacitySlider.Value = settings.WindowOpacity;
         DarknessSlider.Value = settings.BgDarkness;
+        BlurCheck.IsChecked = settings.BlurEnabled;
+        BlurCheck.Checked += (_, _) => { settings.BlurEnabled = true; settings.Save(); AppearanceChanged?.Invoke(); };
+        BlurCheck.Unchecked += (_, _) => { settings.BlurEnabled = false; settings.Save(); AppearanceChanged?.Invoke(); };
         BuildAccentRadios();
 
         // 行为

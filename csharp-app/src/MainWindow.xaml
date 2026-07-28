@@ -9,8 +9,8 @@
 
     <Window.Resources>
         <SolidColorBrush x:Key="FgBrush" Color="#FFFFFF"/>
-        <SolidColorBrush x:Key="SubBrush" Color="#C9CDD8"/>
-        <SolidColorBrush x:Key="DimBrush" Color="#5C6070"/>
+        <SolidColorBrush x:Key="SubBrush" Color="#DDE1EA"/>
+        <SolidColorBrush x:Key="DimBrush" Color="#A6ACBD"/>
         <SolidColorBrush x:Key="LineBrush" Color="#14FFFFFF"/>
         <SolidColorBrush x:Key="CardBrush" Color="#0AFFFFFF"/>
         <SolidColorBrush x:Key="CardHoverBrush" Color="#14FFFFFF"/>
@@ -78,7 +78,7 @@
                                         <TextBlock Text="★" FontSize="12"
                                                    Foreground="{Binding DataContext.AccentBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
                                                    Visibility="{Binding IsFavorite, Converter={x:Static local:BoolVisConverter.Instance}}"/>
-                                        <TextBlock Text="☆" FontSize="12" Foreground="#8F93A3"
+                                        <TextBlock Text="☆" FontSize="12" Foreground="#C9CDD8"
                                                    Visibility="{Binding IsFavorite, Converter={x:Static local:BoolVisConverter.Instance}, ConverterParameter=invert}"/>
                                     </Grid>
                                 </Button>
@@ -111,9 +111,7 @@
                 <GradientStop Color="#0CFFFFFF" Offset="1"/>
             </LinearGradientBrush>
         </Border.BorderBrush>
-        <Border.Effect>
-            <DropShadowEffect BlurRadius="26" ShadowDepth="3" Opacity="0.38" Color="Black"/>
-        </Border.Effect>
+        <!-- 无外发光晕：单层干净卡片（用户实测反馈"背景两层"= 这个 26px 阴影圈） -->
         <Grid>
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
@@ -180,7 +178,8 @@
             <Grid Grid.Row="4" Margin="13,0,8,7">
                 <TextBlock x:Name="StatusText" FontSize="9.5" Foreground="{StaticResource DimBrush}"
                            Effect="{StaticResource TextShadow}" VerticalAlignment="Center"/>
-                <Rectangle Width="14" Height="14" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                <Rectangle x:Name="ResizeGrip" Width="14" Height="14" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                           Visibility="Collapsed"
                            Cursor="SizeNWSE" MouseLeftButtonDown="Grip_Resize">
                     <Rectangle.Fill>
                         <DrawingBrush Viewport="0,0,4,4" ViewportUnits="Absolute" TileMode="Tile">
