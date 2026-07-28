@@ -30,8 +30,10 @@ public partial class SettingsWindow : Window
 
         // 行为
         ClickDetail.IsChecked = settings.ClickTarget == ClickTarget.Detail;
+        ClickPlay.IsChecked = settings.ClickTarget == ClickTarget.Play;
         ClickSearch.IsChecked = settings.ClickTarget == ClickTarget.Search;
         ClickDetail.Checked += (_, _) => SetClick(ClickTarget.Detail);
+        ClickPlay.Checked += (_, _) => SetClick(ClickTarget.Play);
         ClickSearch.Checked += (_, _) => SetClick(ClickTarget.Search);
 
         foreach (var m in new[] { 15, 30, 60, 120 })

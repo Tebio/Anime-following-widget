@@ -53,6 +53,7 @@
                     <TextBlock Text="点击番名打开" FontSize="12" Margin="0,0,0,2"/>
                     <StackPanel Orientation="Horizontal">
                         <RadioButton x:Name="ClickDetail" Content="详情页（直达）" GroupName="click"/>
+                        <RadioButton x:Name="ClickPlay" Content="播放页（最新一集）" GroupName="click"/>
                         <RadioButton x:Name="ClickSearch" Content="搜索页" GroupName="click"/>
                     </StackPanel>
                     <Grid Margin="0,6,0,2">

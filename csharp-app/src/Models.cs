@@ -1,6 +1,7 @@
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace AnimeWidget;
 
@@ -19,6 +20,14 @@ public class Entry
     public string DetailUrl(string baseUrl) => $"{baseUrl}/detail/{DetailId}";
     public string SearchUrl(string baseUrl) =>
         $"{baseUrl}/search?query={Uri.EscapeDataString(Title)}";
+    /// <summary>最新一集播放页：Label "第04集" → /play/{id}/1/4；无集数（PV 等）回退详情页。</summary>
+    public string PlayUrl(string baseUrl)
+    {
+        var m = Regex.Match(Label, @"\d+");
+        return m.Success && DetailId.Length > 0
+            ? $"{baseUrl}/play/{DetailId}/1/{int.Parse(m.Value)}"
+            : DetailUrl(baseUrl);
+    }
 }
 
 public class DaySchedule
@@ -37,7 +46,7 @@ public class WeekSchedule
 }
 
 /// <summary>点击番名的行为。</summary>
-public enum ClickTarget { Detail, Search }
+public enum ClickTarget { Detail, Search, Play }
 
 /// <summary>桌面嵌入方式。</summary>
 public enum EmbedMode
@@ -67,7 +76,7 @@ public class AppSettings
     /// <summary>收藏的番（DetailId 集合），到点提醒只针对收藏。</summary>
     public List<string> Favorites { get; set; } = new();
     public bool FavoritesOnly { get; set; } = false;
-    public ClickTarget ClickTarget { get; set; } = ClickTarget.Detail;
+    public ClickTarget ClickTarget { get; set; } = ClickTarget.Play;
     public EmbedMode EmbedMode { get; set; } = EmbedMode.Normal;
 
     /// <summary>强调色预设（与 Rust 版一致）。</summary>

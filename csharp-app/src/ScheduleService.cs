@@ -189,7 +189,8 @@ public class ScheduleService : IDisposable
 
         return new WeekSchedule
         {
-            Base = baseUrl.TrimEnd('/'),
+            // Base 用于拼浏览器链接（详情/播放/搜索页），必须指向 Web 站而非 API 域
+            Base = "https://www.agedm.io",
             Days = days,
             FetchedAt = DateTime.Now.ToString("yyyy-MM-dd HH:mm"),
         };

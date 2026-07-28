@@ -36,8 +36,12 @@ public class EntryViewModel
     /// <summary>星标：收藏常亮，未收藏半隐（hover 行时提亮由模板触发器负责）。</summary>
     public double StarOpacity => IsFavorite ? 1.0 : 0.35;
 
-    public string Url(ClickTarget target) =>
-        target == ClickTarget.Detail ? Model.DetailUrl(BaseUrl) : Model.SearchUrl(BaseUrl);
+    public string Url(ClickTarget target) => target switch
+    {
+        ClickTarget.Detail => Model.DetailUrl(BaseUrl),
+        ClickTarget.Play => Model.PlayUrl(BaseUrl),
+        _ => Model.SearchUrl(BaseUrl),
+    };
 }
 
 public class AppViewModel : ObservableBase
