@@ -8,7 +8,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AnimeWidget</RootNamespace>
     <AssemblyName>AnimeWidget</AssemblyName>
-    <Version>3.9.1</Version>
+    <Version>3.9.2</Version>
     <Description>追番桌面卡片 — AGE 动漫周表（C# WPF 版）</Description>
 
     <!-- 单文件发布 -->

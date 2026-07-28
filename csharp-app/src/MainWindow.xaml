@@ -8,8 +8,8 @@
         MouseLeftButtonDown="Root_Drag">
 
     <Window.Resources>
-        <SolidColorBrush x:Key="FgBrush" Color="#EDEDF2"/>
-        <SolidColorBrush x:Key="SubBrush" Color="#8F93A3"/>
+        <SolidColorBrush x:Key="FgBrush" Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="SubBrush" Color="#C9CDD8"/>
         <SolidColorBrush x:Key="DimBrush" Color="#5C6070"/>
         <SolidColorBrush x:Key="LineBrush" Color="#14FFFFFF"/>
         <SolidColorBrush x:Key="CardBrush" Color="#0AFFFFFF"/>
@@ -39,8 +39,8 @@
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <TextBlock x:Name="TitleText" Text="{Binding Title}" FontSize="12.5"
-                                               FontWeight="Medium"
+                                    <TextBlock x:Name="TitleText" Text="{Binding Title}" FontSize="13"
+                                               FontWeight="SemiBold"
                                                Foreground="{StaticResource FgBrush}"
                                                Effect="{StaticResource TextShadow}"
                                                TextTrimming="CharacterEllipsis" MaxWidth="185"
@@ -55,7 +55,8 @@
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
                                             Visibility="{Binding IsEnd, Converter={x:Static local:BoolVisConverter.Instance}, ConverterParameter=invert}">
                                     <TextBlock Text="{Binding TimeText}" FontSize="11"
-                                               Foreground="#D8DBE3" Effect="{StaticResource TextShadow}"
+                                               FontWeight="SemiBold"
+                                               Foreground="#FFFFFF" Effect="{StaticResource TextShadow}"
                                                Margin="0,0,5,0"/>
                                     <TextBlock Text="{Binding LabelText}" FontSize="10"
                                                Effect="{StaticResource TextShadow}"

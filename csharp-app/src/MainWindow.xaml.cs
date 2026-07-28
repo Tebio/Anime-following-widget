@@ -231,14 +231,15 @@ public partial class MainWindow : Window
 
     private void ApplyBgDarkness()
     {
-        // bg_darkness 0(通透磨砂)~1(深沉)：v3.9.1 材质重做——
-        // 高模糊(亚克力) + 低面板 alpha + 文字阴影 = 商业挂件通透感。
-        // alpha 从 0x18(d=0, 几乎纯磨砂) 到 0xC0(d=1, 深沉玻璃)，默认 0.55 ≈ 45%。
+        // bg_darkness 0(通透磨砂)~1(深沉)：v3.9.2 复刻优效材质公式——
+        // 逆向实锤：优效底板=73% 深色纯色块(无模糊)，文字=纯白+粗字重。
+        // ACCENT 亚克力对透明 WPF 窗口静默失效，别指望模糊，底板深度才是主体。
+        // alpha 从 0x30(d=0) 到 0xE8(d=1)，默认 0.55 ≈ 优效同款 73%。
         // WindowOpacity 折进背景 alpha（不动整窗 Opacity，文字保持锐利）。
         var d = Math.Clamp(_settings.BgDarkness, 0, 1);
-        var v = (byte)(28 - d * 14);              // 28(亮灰黑) → 14(近黑)
-        var a = (byte)Math.Min(255, (0x18 + d * 0xA8) * Math.Clamp(_settings.WindowOpacity, 0.2, 1));
-        RootBorder.Background = new SolidColorBrush(Color.FromArgb(a, v, (byte)(v + 2), (byte)(v + 8)));
+        var v = (byte)(40 - d * 24);              // 40(深蓝灰 ~#1F2838) → 16(近黑)
+        var a = (byte)Math.Min(255, (0x30 + d * 0xB8) * Math.Clamp(_settings.WindowOpacity, 0.2, 1));
+        RootBorder.Background = new SolidColorBrush(Color.FromArgb(a, (byte)(v - 4), v, (byte)(v + 16)));
     }
 
     // ---------- 周几 tabs（代码构建，accent 感知） ----------
