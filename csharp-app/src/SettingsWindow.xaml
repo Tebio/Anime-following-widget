@@ -2,21 +2,92 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:AnimeWidget"
-        Title="设置" Width="360" Height="660"
-        Background="#F014161C" Foreground="#EDEDF2"
+        Title="设置" Width="400" Height="680"
+        Background="#F0161A22" Foreground="#EDEDF2"
         FontFamily="Microsoft YaHei UI"
         WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
     <Window.Resources>
-        <SolidColorBrush x:Key="SubBrush" Color="#8F93A3"/>
-        <SolidColorBrush x:Key="DimBrush" Color="#5C6070"/>
+        <SolidColorBrush x:Key="SubBrush" Color="#B9BEC9"/>
+        <SolidColorBrush x:Key="DimBrush" Color="#8B91A0"/>
         <SolidColorBrush x:Key="CardBrush" Color="#0AFFFFFF"/>
-        <Style TargetType="RadioButton">
-            <Setter Property="Foreground" Value="#EDEDF2"/>
-            <Setter Property="Margin" Value="0,3,14,3"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="#2BA8A0"/>
+
+        <!-- iOS 风开关（CheckBox → 拨杆），优效同款交互 -->
+        <Style x:Key="Switch" TargetType="CheckBox">
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Margin" Value="0,5,0,5"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="CheckBox">
+                        <StackPanel Orientation="Horizontal">
+                            <Border x:Name="Track" Width="34" Height="20" CornerRadius="10"
+                                    Background="#3A3F4A" Padding="2" VerticalAlignment="Center">
+                                <Border x:Name="Knob" Width="16" Height="16" CornerRadius="8"
+                                        Background="#C9CDD8" HorizontalAlignment="Left"/>
+                            </Border>
+                            <ContentPresenter Margin="9,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Track" Property="Background" Value="#2BA8A0"/>
+                                <Setter TargetName="Knob" Property="Background" Value="White"/>
+                                <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
-        <Style TargetType="CheckBox">
-            <Setter Property="Foreground" Value="#EDEDF2"/>
-            <Setter Property="Margin" Value="0,3,0,3"/>
+
+        <!-- 圆头滑杆 -->
+        <Style TargetType="Thumb">
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Ellipse Width="14" Height="14" Fill="White"
+                                 Stroke="#2BA8A0" StrokeThickness="2"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 强调色实心按钮 -->
+        <Style x:Key="AccentBtn" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="12.5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="9"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 描边小按钮 -->
+        <Style x:Key="GhostBtn" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#B9BEC9"/>
+            <Setter Property="FontSize" Value="11.5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="8"
+                                BorderBrush="#3A3F4A" BorderThickness="1"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Window.Resources>
 
@@ -29,21 +100,21 @@
                 <StackPanel>
                     <Grid>
                         <TextBlock Text="窗口透明度" FontSize="12" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="OpacityValue" FontSize="11" Foreground="{StaticResource SubBrush}"
-                                   HorizontalAlignment="Right"/>
+                        <TextBlock x:Name="OpacityValue" FontSize="11.5" FontWeight="SemiBold"
+                                   Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Right"/>
                     </Grid>
-                    <Slider x:Name="OpacitySlider" Minimum="0.3" Maximum="1.0" TickFrequency="0.05"
-                            Margin="0,4,0,8" ValueChanged="Opacity_Changed"/>
+                    <Slider x:Name="OpacitySlider" Minimum="0.1" Maximum="1.0"
+                            Margin="0,6,0,10" ValueChanged="Opacity_Changed"/>
                     <Grid>
                         <TextBlock Text="背景深浅" FontSize="12" VerticalAlignment="Center"/>
-                        <TextBlock x:Name="DarknessValue" FontSize="11" Foreground="{StaticResource SubBrush}"
-                                   HorizontalAlignment="Right"/>
+                        <TextBlock x:Name="DarknessValue" FontSize="11.5" FontWeight="SemiBold"
+                                   Foreground="{StaticResource AccentBrush}" HorizontalAlignment="Right"/>
                     </Grid>
-                    <Slider x:Name="DarknessSlider" Minimum="0" Maximum="1.0" TickFrequency="0.05"
-                            Margin="0,4,0,8" ValueChanged="Darkness_Changed"/>
-                    <CheckBox x:Name="BlurCheck" Content="磨砂背景（系统亚克力模糊）" Margin="0,0,0,6"/>
-                    <TextBlock Text="强调色" FontSize="12" Margin="0,2,0,4"/>
-                    <StackPanel x:Name="AccentPanel"/>
+                    <Slider x:Name="DarknessSlider" Minimum="0" Maximum="1.0"
+                            Margin="0,6,0,6" ValueChanged="Darkness_Changed"/>
+                    <CheckBox x:Name="BlurCheck" Style="{StaticResource Switch}" Content="磨砂背景（系统亚克力模糊）"/>
+                    <TextBlock Text="强调色" FontSize="12" Margin="0,8,0,6"/>
+                    <StackPanel x:Name="AccentPanel" Orientation="Horizontal"/>
                 </StackPanel>
             </Border>
 
@@ -51,51 +122,66 @@
             <TextBlock Text="行为" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DimBrush}"/>
             <Border Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12" Margin="0,6,0,12">
                 <StackPanel>
-                    <TextBlock Text="点击番名打开" FontSize="12" Margin="0,0,0,2"/>
-                    <StackPanel Orientation="Horizontal">
-                        <RadioButton x:Name="ClickDetail" Content="详情页（直达）" GroupName="click"/>
-                        <RadioButton x:Name="ClickPlay" Content="播放页（最新一集）" GroupName="click"/>
-                        <RadioButton x:Name="ClickSearch" Content="搜索页" GroupName="click"/>
-                    </StackPanel>
-                    <Grid Margin="0,6,0,2">
+                    <TextBlock Text="点击番名打开" FontSize="12" Margin="0,0,0,6"/>
+                    <StackPanel x:Name="ClickPills" Orientation="Horizontal" Margin="0,0,0,10"/>
+                    <Grid Margin="0,0,0,6">
                         <TextBlock Text="自动刷新间隔" FontSize="12" VerticalAlignment="Center"/>
-                        <ComboBox x:Name="RefreshCombo" Width="90" HorizontalAlignment="Right"
-                                  SelectionChanged="RefreshCombo_Changed"/>
                     </Grid>
-                    <CheckBox x:Name="ThroughCheck" Content="鼠标穿透（点击穿过卡片）"/>
-                    <CheckBox x:Name="LockCheck" Content="锁定位置（禁止拖拽）"/>
-                    <CheckBox x:Name="NotifyCheck" Content="更新提醒（仅收藏的番，到点气泡通知）"/>
-                    <CheckBox x:Name="FavOnlyCheck" Content="只显示收藏的番"/>
+                    <StackPanel x:Name="RefreshPills" Orientation="Horizontal" Margin="0,0,0,8"/>
+                    <CheckBox x:Name="ThroughCheck" Style="{StaticResource Switch}" Content="鼠标穿透（点击穿过卡片）"/>
+                    <CheckBox x:Name="LockCheck" Style="{StaticResource Switch}" Content="锁定位置（禁止拖拽）"/>
+                    <CheckBox x:Name="NotifyCheck" Style="{StaticResource Switch}" Content="更新提醒（收藏的番到点通知）"/>
+                    <CheckBox x:Name="FavOnlyCheck" Style="{StaticResource Switch}" Content="只显示收藏的番"/>
                 </StackPanel>
             </Border>
 
-            <!-- 桌面嵌入 -->
+            <!-- 桌面嵌入：选项卡式（长文本自动换行，不再截断） -->
             <TextBlock Text="桌面嵌入" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DimBrush}"/>
-            <Border Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12" Margin="0,6,0,12">
-                <StackPanel>
-                    <RadioButton x:Name="EmbedNormal" Content="普通窗口（默认，兼容 iTop/酷呆等桌面整理软件）" GroupName="embed"/>
-                    <RadioButton x:Name="EmbedWorkerW" Content="壁纸层（Win+D 不消失，可能与桌面整理软件冲突）" GroupName="embed"/>
-                    <RadioButton x:Name="EmbedBottomPin" Content="置底窗口（普通窗口压最底，Win+D 会一起隐藏）" GroupName="embed"/>
-                    <TextBlock Text="和桌面整理软件冲突/壁纸层点不动时，切回普通窗口即可，立即生效不用重启" FontSize="10"
-                               Foreground="{StaticResource DimBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
-                </StackPanel>
-            </Border>
+            <StackPanel Margin="0,6,0,12">
+                <Border x:Name="EmbedCardNormal" Background="{StaticResource CardBrush}" CornerRadius="12"
+                        Padding="12,10" Margin="0,0,0,6" Cursor="Hand"
+                        MouseLeftButtonUp="EmbedCard_Click" Tag="0">
+                    <StackPanel>
+                        <TextBlock Text="普通窗口（默认）" FontSize="12" FontWeight="SemiBold"/>
+                        <TextBlock Text="兼容 iTop / 酷呆等桌面整理软件，Win+D 会一起隐藏" FontSize="10.5"
+                                   Foreground="{StaticResource DimBrush}" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                    </StackPanel>
+                </Border>
+                <Border x:Name="EmbedCardWorkerW" Background="{StaticResource CardBrush}" CornerRadius="12"
+                        Padding="12,10" Margin="0,0,0,6" Cursor="Hand"
+                        MouseLeftButtonUp="EmbedCard_Click" Tag="1">
+                    <StackPanel>
+                        <TextBlock Text="壁纸层" FontSize="12" FontWeight="SemiBold"/>
+                        <TextBlock Text="挂在壁纸上层，Win+D 不消失；可能与桌面整理软件冲突" FontSize="10.5"
+                                   Foreground="{StaticResource DimBrush}" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                    </StackPanel>
+                </Border>
+                <Border x:Name="EmbedCardBottomPin" Background="{StaticResource CardBrush}" CornerRadius="12"
+                        Padding="12,10" Margin="0,0,0,6" Cursor="Hand"
+                        MouseLeftButtonUp="EmbedCard_Click" Tag="2">
+                    <StackPanel>
+                        <TextBlock Text="置底窗口" FontSize="12" FontWeight="SemiBold"/>
+                        <TextBlock Text="普通窗口压到最底，不抢焦点；Win+D 会一起隐藏" FontSize="10.5"
+                                   Foreground="{StaticResource DimBrush}" TextWrapping="Wrap" Margin="0,3,0,0"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
 
             <!-- 数据诊断 -->
             <TextBlock Text="数据" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DimBrush}"/>
-            <Border Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12" Margin="0,6,0,4">
+            <Border Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12" Margin="0,6,0,10">
                 <StackPanel>
                     <TextBlock x:Name="ProxyText" FontSize="11" Foreground="{StaticResource SubBrush}"/>
                     <TextBlock x:Name="SourceTextDiag" FontSize="11" Foreground="{StaticResource SubBrush}"
-                               Margin="0,2,0,0"/>
+                               TextWrapping="Wrap" Margin="0,2,0,0"/>
                     <TextBlock x:Name="LastErrorText" FontSize="10" Foreground="#D08080"
                                TextWrapping="Wrap" Margin="0,4,0,0"/>
-                    <Button Content="立即刷新" Margin="0,8,0,0" Padding="14,5" HorizontalAlignment="Left"
-                            Click="RefreshNow_Click"/>
+                    <Button Content="立即刷新" Style="{StaticResource GhostBtn}" Margin="0,8,0,0"
+                            Padding="14,5" HorizontalAlignment="Left" Click="RefreshNow_Click"/>
                 </StackPanel>
             </Border>
 
-            <Button Content="完成" Margin="0,10,0,4" Padding="0,7" Click="Done_Click"/>
+            <Button Content="完成" Style="{StaticResource AccentBtn}" Padding="0,8" Click="Done_Click"/>
         </StackPanel>
     </ScrollViewer>
 </Window>

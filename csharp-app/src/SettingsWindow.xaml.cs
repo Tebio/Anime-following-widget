@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace AnimeWidget;
@@ -10,7 +11,12 @@ public partial class SettingsWindow : Window
     private readonly ScheduleService _sched;
     private bool _ready;
 
-    /// <summary>透明度/强调色/背景深浅变了（MainWindow 重刷外观）。</summary>
+    private static readonly Color AccentColor = Color.FromRgb(0x2B, 0xA8, 0xA0);
+    private static readonly Brush AccentBrush = new SolidColorBrush(AccentColor);
+    private static readonly Brush PillOffBrush = new SolidColorBrush(Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF));
+    private static readonly Brush PillTextOff = new SolidColorBrush(Color.FromRgb(0xDD, 0xE1, 0xEA));
+
+    /// <summary>透明度/强调色/背景深浅/磨砂变了（MainWindow 重刷外观）。</summary>
     public event Action? AppearanceChanged;
     public event Action<EmbedMode>? EmbedModeChanged;
 
@@ -29,23 +35,17 @@ public partial class SettingsWindow : Window
         BlurCheck.IsChecked = settings.BlurEnabled;
         BlurCheck.Checked += (_, _) => { settings.BlurEnabled = true; settings.Save(); AppearanceChanged?.Invoke(); };
         BlurCheck.Unchecked += (_, _) => { settings.BlurEnabled = false; settings.Save(); AppearanceChanged?.Invoke(); };
-        BuildAccentRadios();
+        BuildAccentSwatches();
 
-        // 行为
-        ClickDetail.IsChecked = settings.ClickTarget == ClickTarget.Detail;
-        ClickPlay.IsChecked = settings.ClickTarget == ClickTarget.Play;
-        ClickSearch.IsChecked = settings.ClickTarget == ClickTarget.Search;
-        ClickDetail.Checked += (_, _) => SetClick(ClickTarget.Detail);
-        ClickPlay.Checked += (_, _) => SetClick(ClickTarget.Play);
-        ClickSearch.Checked += (_, _) => SetClick(ClickTarget.Search);
-
-        foreach (var m in new[] { 15, 30, 60, 120 })
-        {
-            var item = new ComboBoxItem { Content = $"{m} 分钟", Tag = m };
-            RefreshCombo.Items.Add(item);
-            if (m == settings.RefreshMinutes) RefreshCombo.SelectedItem = item;
-        }
-        if (RefreshCombo.SelectedItem == null) RefreshCombo.SelectedIndex = 1;
+        // 行为：分段胶囊（替代单选/下拉，所见即所得）
+        BuildPills(ClickPills, new[] { "详情页", "播放页", "搜索页" },
+            settings.ClickTarget switch { ClickTarget.Detail => 0, ClickTarget.Play => 1, _ => 2 },
+            i => SetClick(i switch { 0 => ClickTarget.Detail, 1 => ClickTarget.Play, _ => ClickTarget.Search }));
+        var mins = new[] { 15, 30, 60, 120 };
+        var mi = Array.IndexOf(mins, settings.RefreshMinutes);
+        BuildPills(RefreshPills, mins.Select(m => $"{m} 分钟").ToArray(),
+            mi >= 0 ? mi : 1,
+            i => { _settings.RefreshMinutes = mins[i]; _sched.SetInterval(mins[i]); _settings.Save(); });
 
         ThroughCheck.IsChecked = settings.ClickThrough;
         ThroughCheck.Checked += (_, _) => { settings.ClickThrough = true; settings.Save(); };
@@ -63,13 +63,8 @@ public partial class SettingsWindow : Window
         FavOnlyCheck.Checked += (_, _) => { settings.FavoritesOnly = true; settings.Save(); ListRefreshNeeded?.Invoke(); };
         FavOnlyCheck.Unchecked += (_, _) => { settings.FavoritesOnly = false; settings.Save(); ListRefreshNeeded?.Invoke(); };
 
-        // 嵌入
-        EmbedNormal.IsChecked = settings.EmbedMode == EmbedMode.Normal;
-        EmbedWorkerW.IsChecked = settings.EmbedMode == EmbedMode.WorkerW;
-        EmbedBottomPin.IsChecked = settings.EmbedMode == EmbedMode.BottomPin;
-        EmbedNormal.Checked += (_, _) => SetEmbed(EmbedMode.Normal);
-        EmbedWorkerW.Checked += (_, _) => SetEmbed(EmbedMode.WorkerW);
-        EmbedBottomPin.Checked += (_, _) => SetEmbed(EmbedMode.BottomPin);
+        // 嵌入选项卡高亮
+        UpdateEmbedCards();
 
         // 数据
         ProxyText.Text = $"代理：{sched.ProxyDesc}";
@@ -83,44 +78,106 @@ public partial class SettingsWindow : Window
         DarknessValue.Text = $"{_settings.BgDarkness:P0}";
     }
 
-    private void BuildAccentRadios()
+    // ---------- 强调色圆点（选中带描边环） ----------
+
+    private void BuildAccentSwatches()
     {
+        AccentPanel.Children.Clear();
         for (var i = 0; i < AppSettings.Accents.Length; i++)
         {
             var idx = i;
-            var (name, r, g, b) = AppSettings.Accents[i];
-            var rb = new RadioButton { GroupName = "accent", IsChecked = _settings.Accent == idx };
-            var sp = new StackPanel { Orientation = Orientation.Horizontal };
-            sp.Children.Add(new Border
+            var (_, r, g, b) = AppSettings.Accents[i];
+            var ring = new Border
             {
-                Width = 12, Height = 12,
-                CornerRadius = new CornerRadius(6),
+                Width = 26, Height = 26, CornerRadius = new CornerRadius(13),
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(2),
+                BorderBrush = _settings.Accent == idx ? AccentBrush : Brushes.Transparent,
+                Padding = new Thickness(3),
+                Margin = new Thickness(0, 0, 10, 0),
+                Cursor = Cursors.Hand,
+                ToolTip = AppSettings.Accents[idx].Name,
+            };
+            ring.Child = new Border
+            {
+                CornerRadius = new CornerRadius(10),
                 Background = new SolidColorBrush(Color.FromRgb(r, g, b)),
-                Margin = new Thickness(0, 0, 6, 0),
-                VerticalAlignment = VerticalAlignment.Center,
-            });
-            sp.Children.Add(new TextBlock
-            {
-                Text = name,
-                FontSize = 12,
-                VerticalAlignment = VerticalAlignment.Center,
-            });
-            rb.Content = sp;
-            rb.Checked += (_, _) =>
+            };
+            ring.MouseLeftButtonUp += (_, _) =>
             {
                 _settings.Accent = idx;
                 _settings.Save();
+                BuildAccentSwatches(); // 重排选中环
                 AppearanceChanged?.Invoke();
             };
-            AccentPanel.Children.Add(rb);
+            AccentPanel.Children.Add(ring);
         }
     }
+
+    // ---------- 分段胶囊 ----------
+
+    private void BuildPills(Panel host, string[] labels, int selected, Action<int> onPick)
+    {
+        host.Children.Clear();
+        for (var i = 0; i < labels.Length; i++)
+        {
+            var idx = i;
+            var b = new Border
+            {
+                CornerRadius = new CornerRadius(8),
+                Padding = new Thickness(12, 5, 12, 5),
+                Margin = new Thickness(0, 0, 8, 0),
+                Cursor = Cursors.Hand,
+                Background = idx == selected ? AccentBrush : PillOffBrush,
+                Child = new TextBlock
+                {
+                    Text = labels[idx],
+                    FontSize = 11.5,
+                    Foreground = idx == selected ? Brushes.White : PillTextOff,
+                },
+            };
+            b.MouseLeftButtonUp += (_, _) =>
+            {
+                onPick(idx);
+                BuildPills(host, labels, idx, onPick); // 重排高亮
+            };
+            host.Children.Add(b);
+        }
+    }
+
+    // ---------- 嵌入选项卡 ----------
+
+    private void EmbedCard_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (!_ready || sender is not Border card) return;
+        SetEmbed(int.Parse((string)card.Tag) switch { 0 => EmbedMode.Normal, 1 => EmbedMode.WorkerW, _ => EmbedMode.BottomPin });
+        UpdateEmbedCards();
+    }
+
+    private void UpdateEmbedCards()
+    {
+        var sel = _settings.EmbedMode;
+        foreach (var (card, mode) in new[]
+        {
+            (EmbedCardNormal, EmbedMode.Normal),
+            (EmbedCardWorkerW, EmbedMode.WorkerW),
+            (EmbedCardBottomPin, EmbedMode.BottomPin),
+        })
+        {
+            var on = sel == mode;
+            card.BorderThickness = new Thickness(1.5);
+            card.BorderBrush = on ? AccentBrush : Brushes.Transparent;
+        }
+    }
+
+    // ---------- 滑杆（实时应用 + 持久化——v3.9.3 漏了 Save，重启丢设置） ----------
 
     private void Opacity_Changed(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
         if (!_ready) return;
         _settings.WindowOpacity = Math.Round(e.NewValue, 2);
         OpacityValue.Text = $"{_settings.WindowOpacity:P0}";
+        _settings.Save();
         AppearanceChanged?.Invoke();
     }
 
@@ -129,6 +186,7 @@ public partial class SettingsWindow : Window
         if (!_ready) return;
         _settings.BgDarkness = Math.Round(e.NewValue, 2);
         DarknessValue.Text = $"{_settings.BgDarkness:P0}";
+        _settings.Save();
         AppearanceChanged?.Invoke();
     }
 
@@ -145,14 +203,6 @@ public partial class SettingsWindow : Window
         _settings.EmbedMode = m;
         _settings.Save();
         EmbedModeChanged?.Invoke(m);
-    }
-
-    private void RefreshCombo_Changed(object sender, SelectionChangedEventArgs e)
-    {
-        if (!_ready || RefreshCombo.SelectedItem is not ComboBoxItem item) return;
-        _settings.RefreshMinutes = (int)item.Tag;
-        _sched.SetInterval((int)item.Tag); // 立即生效，不用重启
-        _settings.Save();
     }
 
     private void RefreshNow_Click(object sender, RoutedEventArgs e) => _sched.RefreshNow();
