@@ -766,7 +766,7 @@ public partial class MainWindow : Window
         var count = _vm.SelectedDayCount;
         StatusText.Text = _sched.LastError != null && _sched.Current == null
             ? $"离线 · 代理：{_sched.ProxyDesc}"
-            : $"{ScheduleService.WeekdayNames[_vm.SelectedDay]} {count} 部 · {_sched.ProxyDesc}";
+            : $"{ScheduleService.WeekdayNames[_vm.SelectedDay]} {count} 部"; // 代理是诊断信息，只留在设置→数据，别糊在主界面底栏
     }
 
     private void Persist()

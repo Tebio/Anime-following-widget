@@ -162,8 +162,11 @@
                 </StackPanel>
             </Border>
 
-            <!-- 周几 pills（窗口变窄时可横向滚动，滚轮=横滚） -->
-            <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+            <!-- 周几 pills（窗口变窄时可横向滚动，滚轮=横滚）。
+                 HorizontalScrollBarVisibility 必须 Hidden 而非 Auto：
+                 Auto 时 tab 轻微溢出就在 tab 行下冒出一条滚动条空带（用户圈出的"空白断层"），
+                 Hidden 不影响 PreviewMouseWheel 的 ScrollToHorizontalOffset 编程滚动 -->
+            <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled"
                           Margin="11,7,10,3" PreviewMouseWheel="TabScroll_Wheel">
                 <StackPanel x:Name="TabPanel" Orientation="Horizontal"/>
             </ScrollViewer>

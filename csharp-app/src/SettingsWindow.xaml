@@ -16,6 +16,9 @@
         <Style x:Key="Switch" TargetType="CheckBox">
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="FontSize" Value="12"/>
+            <!-- 必显式设前景！主题样式 ControlText(近黑) 优先级高于 Window.Foreground 继承，
+                 不显式设 = 黑字压深卡 = 用户看到的"开关标题糊成一团" -->
+            <Setter Property="Foreground" Value="#EDEDF2"/>
             <Setter Property="Margin" Value="0,5,0,5"/>
             <Setter Property="Template">
                 <Setter.Value>
