@@ -34,7 +34,7 @@ public static class SelfBlur
     private struct BITMAPINFO { public BITMAPINFOHEADER Header; public int Colors; }
 
     /// <summary>抓 hwnd 矩形区域背后的屏幕，模糊+ tint 后返回冻结位图；失败返回 null（调用方回退纯色）。</summary>
-    public static BitmapSource? CaptureBlurred(IntPtr hwndHide, Win32.RECT rect)
+    internal static BitmapSource? CaptureBlurred(IntPtr hwndHide, Win32.RECT rect)
     {
         int w = rect.Right - rect.Left, h = rect.Bottom - rect.Top;
         if (w < 16 || h < 16) return null;
