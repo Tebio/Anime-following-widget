@@ -76,12 +76,22 @@ public static class SelfBlur
             BoxBlur(data, sw, sh, 6);
             BoxBlur(data, sw, sh, 6);
 
-            // 深色 tint 烘焙（55% #141D18 系）：通透感 + 白字可读性
+            // 自适应深色 tint：按抓取区平均亮度定烘焙强度——
+            // 亮壁纸加重（保白字对比，治"亮色背景显示有问题"），暗壁纸减轻（保通透）
+            long lumaSum = 0; int lumaN = 0;
+            for (int i = 0; i + 2 < data.Length; i += 40)
+            {
+                lumaSum += data[i] * 2 + data[i + 1] * 3 + data[i + 2]; // ≈ BT.601
+                lumaN += 6;
+            }
+            double luma = lumaN > 0 ? (double)lumaSum / lumaN / 255.0 : 0.5;
+            double tint = 0.42 + luma * 0.38; // 0.42(暗壁纸) ~ 0.80(亮壁纸)
+
             for (int i = 0; i + 3 < data.Length; i += 4)
             {
-                data[i] = (byte)(data[i] * 0.45 + 0x18 * 0.55);     // B
-                data[i + 1] = (byte)(data[i + 1] * 0.45 + 0x20 * 0.55); // G
-                data[i + 2] = (byte)(data[i + 2] * 0.45 + 0x14 * 0.55); // R
+                data[i] = (byte)(data[i] * (1 - tint) + 0x18 * tint);     // B
+                data[i + 1] = (byte)(data[i + 1] * (1 - tint) + 0x20 * tint); // G
+                data[i + 2] = (byte)(data[i + 2] * (1 - tint) + 0x14 * tint); // R
                 data[i + 3] = 255;
             }
 

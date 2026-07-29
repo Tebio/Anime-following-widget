@@ -269,12 +269,30 @@ public partial class MainWindow : Window
 
     private void BlurTimer_Tick(object? sender, EventArgs e) => RefreshBlur();
 
-    private void RefreshBlur()
+    // 抓取+模糊全在后台线程（v3.11.1 的 50ms 等待在 UI 线程 = 用户实测"移动会卡顿"），
+    // UI 线程只换刷子；拖动中 120ms 节流实时刷新 ≈ 优效"透视随时更新"的体感。
+    private bool _blurBusy;
+    private DateTime _lastBlurAt = DateTime.MinValue;
+
+    private void RefreshBlur(bool throttle = false)
     {
         if (!_settings.BlurEnabled || _hwnd == IntPtr.Zero || _layer?.Mode == EmbedMode.WorkerW) return;
-        Win32.GetWindowRect(_hwnd, out var r);
-        var img = SelfBlur.CaptureBlurred(_hwnd, r);
-        if (img != null) RootBorder.Background = new ImageBrush(img) { Stretch = Stretch.Fill };
+        if (_blurBusy) return;
+        if (throttle && (DateTime.UtcNow - _lastBlurAt).TotalMilliseconds < 120) return;
+        _blurBusy = true;
+        _lastBlurAt = DateTime.UtcNow;
+        var hwnd = _hwnd;
+        Win32.GetWindowRect(hwnd, out var r);
+        System.Threading.Tasks.Task.Run(() =>
+        {
+            var img = SelfBlur.CaptureBlurred(hwnd, r);
+            Dispatcher.Invoke(() =>
+            {
+                _blurBusy = false;
+                if (img != null && _settings.BlurEnabled)
+                    RootBorder.Background = new ImageBrush(img) { Stretch = Stretch.Fill };
+            });
+        });
     }
 
     // ---------- 周几 tabs（代码构建，accent 感知） ----------
@@ -670,6 +688,7 @@ public partial class MainWindow : Window
         Win32.SetWindowPos(_hwnd, IntPtr.Zero,
             (int)Math.Round(_dragLogicalX * sx), (int)Math.Round(_dragLogicalY * sy), 0, 0,
             Win32.SWP_NOSIZE | Win32.SWP_NOZORDER | Win32.SWP_NOACTIVATE);
+        if (_settings.BlurEnabled) RefreshBlur(throttle: true); // 拖动中实时透视（后台线程不卡）
     }
 
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
@@ -702,6 +721,8 @@ public partial class MainWindow : Window
     // WorkerW 子窗口的非客户消息不可靠，该模式仍用右下角手柄（Grip_Resize）。
     private const int WM_NCHITTEST = 0x0084;
     private const int WM_EXITSIZEMOVE = 0x0232;
+    private const int WM_MOVING = 0x0216;
+    private const int WM_SIZING = 0x0214;
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
@@ -709,6 +730,11 @@ public partial class MainWindow : Window
         {
             Persist(); // 原生缩放/移动结束 → 尺寸位置落盘
             if (_settings.BlurEnabled) RefreshBlur(); // 位置/尺寸变了 → 重抓身后壁纸
+            return IntPtr.Zero;
+        }
+        if ((msg == WM_MOVING || msg == WM_SIZING) && _settings.BlurEnabled)
+        {
+            RefreshBlur(throttle: true); // 原生拖动/缩放中也实时透视
             return IntPtr.Zero;
         }
         if (msg != WM_NCHITTEST) return IntPtr.Zero;
