@@ -191,6 +191,10 @@ internal static class Win32
     [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(POINT pt);
     [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr hwnd, uint gaFlags);
     [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
+    [DllImport("user32.dll")] public static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint dwAffinity);
+    public const uint WDA_NONE = 0x0;
+    public const uint WDA_EXCLUDEFROMCAPTURE = 0x11;
 
     public const uint GA_ROOT = 2;
     public const int VK_LBUTTON = 0x01;

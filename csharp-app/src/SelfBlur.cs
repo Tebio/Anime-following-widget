@@ -33,17 +33,21 @@ public static class SelfBlur
     [StructLayout(LayoutKind.Sequential)]
     private struct BITMAPINFO { public BITMAPINFOHEADER Header; public int Colors; }
 
-    /// <summary>抓 hwnd 矩形区域背后的屏幕，模糊+ tint 后返回冻结位图；失败返回 null（调用方回退纯色）。</summary>
+    /// <summary>抓 hwnd 矩形区域背后的屏幕，模糊+ tint 后返回冻结位图；失败返回 null（调用方回退纯色）。
+    /// v3.11.1：用 WDA_EXCLUDEFROMCAPTURE 让截屏原生跳过自己——全程不藏窗，
+    /// 无闪烁、z-order 不动（v3.11.0 藏窗法：闪烁 + 重新 Show 后跳到最前，两个实测问题）。
+    /// 亲和性设置失败（老系统）时回退藏窗法。</summary>
     internal static BitmapSource? CaptureBlurred(IntPtr hwndHide, Win32.RECT rect)
     {
         int w = rect.Right - rect.Left, h = rect.Bottom - rect.Top;
         if (w < 16 || h < 16) return null;
         int sw = Math.Clamp(w / 2, 4, 720), sh = Math.Clamp(h / 2, 4, 720);
 
-        Win32.ShowWindow(hwndHide, 0); // SW_HIDE：先藏自己，否则抓到自己
+        bool affinity = Win32.SetWindowDisplayAffinity(hwndHide, Win32.WDA_EXCLUDEFROMCAPTURE);
+        if (!affinity) Win32.ShowWindow(hwndHide, 0); // 回退：藏窗（SW_HIDE）
         try
         {
-            System.Threading.Thread.Sleep(40); // 等 DWM 合成一帧干净背景
+            System.Threading.Thread.Sleep(50); // 等 DWM 按新亲和性/藏窗重组一帧（屏幕上无可见变化）
             var screen = GetDC(IntPtr.Zero);
             if (screen == IntPtr.Zero) return null;
             var mem = CreateCompatibleDC(screen);
@@ -87,7 +91,11 @@ public static class SelfBlur
             return wb;
         }
         catch { return null; }
-        finally { Win32.ShowWindow(hwndHide, 8); } // SW_SHOWNA：不抢焦点地恢复
+        finally
+        {
+            if (affinity) Win32.SetWindowDisplayAffinity(hwndHide, Win32.WDA_NONE);
+            else Win32.ShowWindow(hwndHide, 8); // SW_SHOWNA
+        }
     }
 
     /// <summary>滑动窗口盒式模糊：横向一遍 + 纵向一遍。</summary>
