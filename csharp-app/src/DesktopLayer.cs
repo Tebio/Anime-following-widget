@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace AnimeWidget;
@@ -104,7 +105,9 @@ public class DesktopLayer
         Win32.ShowWindow(_hwnd, Win32.SW_SHOWNA);
     }
 
-    /// <summary>标准套路：给 Progman 发 0x052C 让它分裂出壁纸层 WorkerW。</summary>
+    /// <summary>标准套路：给 Progman 发 0x052C 让它分裂出壁纸层 WorkerW。
+    /// 关键：只接受归属 explorer.exe 的 WorkerW——iTop/酷呆自建的 WorkerW 属于它们自己，
+    /// 挂进去父层被重建时会连坐销毁我们的 hwnd（僵尸窗口，只能重启，用户实测"切不回来"）。</summary>
     private static IntPtr FindWorkerW()
     {
         var progman = Win32.FindWindow("Progman", null);
@@ -118,7 +121,7 @@ public class DesktopLayer
             if (Win32.FindWindowEx(top, IntPtr.Zero, "SHELLDLL_DefView", null) != IntPtr.Zero)
             {
                 var workerw = Win32.FindWindowEx(IntPtr.Zero, top, "WorkerW", null);
-                if (workerw != IntPtr.Zero)
+                if (workerw != IntPtr.Zero && Win32.IsExplorerOwned(workerw))
                 {
                     found = workerw;
                     return false; // 停止枚举
@@ -184,6 +187,26 @@ internal static class Win32
 
     [DllImport("user32.dll")] public static extern bool GetCursorPos(out POINT lpPoint);
     [DllImport("user32.dll")] public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+    [DllImport("user32.dll")] public static extern short GetAsyncKeyState(int vKey);
+    [DllImport("user32.dll")] public static extern IntPtr WindowFromPoint(POINT pt);
+    [DllImport("user32.dll")] public static extern IntPtr GetAncestor(IntPtr hwnd, uint gaFlags);
+    [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    public const uint GA_ROOT = 2;
+    public const int VK_LBUTTON = 0x01;
+    public static readonly IntPtr HWND_BOTTOM = new(1);
+
+    /// <summary>窗口是否归属 explorer.exe（WorkerW 挂接前的防连坐校验）。</summary>
+    public static bool IsExplorerOwned(IntPtr hwnd)
+    {
+        try
+        {
+            GetWindowThreadProcessId(hwnd, out var pid);
+            return Process.GetProcessById((int)pid).ProcessName
+                .Equals("explorer", StringComparison.OrdinalIgnoreCase);
+        }
+        catch { return false; }
+    }
 
     [StructLayout(LayoutKind.Sequential)]
     public struct POINT { public int X, Y; }

@@ -176,8 +176,8 @@
                     </Slider>
                     <TextBlock Text="面板颜色：浅蓝灰 ↔ 深黑" FontSize="10"
                                Foreground="{StaticResource DimBrush}" Margin="0,0,0,8"/>
-                    <CheckBox x:Name="BlurCheck" Style="{StaticResource Switch}" Content="磨砂背景（系统亚克力模糊）"/>
-                    <TextBlock Text="打开后壁纸模糊透出；Win11 部分版本系统不支持属正常" FontSize="10"
+                    <CheckBox x:Name="BlurCheck" Style="{StaticResource Switch}" Content="磨砂背景（自截屏模糊）"/>
+                    <TextBlock Text="把身后壁纸模糊后当卡片底，全 Windows 版本可用" FontSize="10"
                                Foreground="{StaticResource DimBrush}" Margin="43,0,0,6"/>
                     <TextBlock Text="强调色" FontSize="12" Margin="0,8,0,6"/>
                     <StackPanel x:Name="AccentPanel" Orientation="Horizontal"/>
@@ -209,6 +209,12 @@
                                Foreground="{StaticResource DimBrush}" Margin="43,0,0,4"/>
                     <CheckBox x:Name="FavOnlyCheck" Style="{StaticResource Switch}" Content="只显示收藏的番"/>
                     <TextBlock Text="列表只保留点过★的那几部" FontSize="10"
+                               Foreground="{StaticResource DimBrush}" Margin="43,0,0,4"/>
+                    <CheckBox x:Name="AutoSinkCheck" Style="{StaticResource Switch}" Content="点击浮上来，点别处沉下去"/>
+                    <TextBlock Text="和优效等桌面插件的层级互动：点卡片=最上层，点别处=沉到桌面" FontSize="10"
+                               Foreground="{StaticResource DimBrush}" Margin="43,0,0,4"/>
+                    <CheckBox x:Name="EdgeHideCheck" Style="{StaticResource Switch}" Content="贴边隐藏"/>
+                    <TextBlock Text="拖到屏幕边缘后缩成一条细边，鼠标靠近自动滑出" FontSize="10"
                                Foreground="{StaticResource DimBrush}" Margin="43,0,0,4"/>
                 </StackPanel>
             </Border>

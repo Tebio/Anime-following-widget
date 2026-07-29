@@ -139,6 +139,7 @@ public partial class MainWindow : Window
         _layer = new DesktopLayer(_hwnd, blocked ? EmbedMode.Normal : want);
         ApplyTopmost();
         ApplyClickThrough();
+        StartInteractionTimer(); // 自动沉降 + 贴边隐藏（200ms 轮询）
         SetupTray();
         if (blocked) WarnOrganizer();
         StartLayerWatchdog();
@@ -235,21 +236,45 @@ public partial class MainWindow : Window
 
     private void ApplyBgDarkness()
     {
-        // v3.9.3 双滑条正交化（用户反馈"两个功能只有两档"= 旧版都混进 alpha，互相冗余）：
-        // 「窗口透明度」= 纯面板 alpha（30% 就是 30% 不透明，所见即所得）
-        // 「背景深浅」  = 纯面板色相（亮蓝灰 → 近黑），不碰 alpha
+        // v3.10.x 起双滑条正交：「窗口透明度」= 纯面板 alpha，「背景深浅」= 纯面板色相。
+        // 磨砂开启时背景由自截屏模糊掌管（RefreshBlur），这里不覆盖。
+        if (_settings.BlurEnabled) return;
         var d = Math.Clamp(_settings.BgDarkness, 0, 1);
         var v = (byte)(40 - d * 24);              // 40(#242838 优效色系) → 16(近黑)
         var a = (byte)Math.Min(255, 255 * Math.Clamp(_settings.WindowOpacity, 0.08, 1));
         RootBorder.Background = new SolidColorBrush(Color.FromArgb(a, (byte)(v - 4), v, (byte)(v + 16)));
     }
 
-    /// <summary>磨砂背景开关（用户自选，默认关）。ACCENT 对透明 WPF 窗口多数情况静默失效——聊胜于无。</summary>
+    // ---------- 自截屏磨砂（v3.11.0 替代系统 ACCENT——后者对透明 WPF 窗口要么失效要么"加个底"） ----------
+
+    private readonly DispatcherTimer _blurTimer = new() { Interval = TimeSpan.FromSeconds(5) };
+
     private void ApplyBlur()
     {
         if (_hwnd == IntPtr.Zero) return;
-        if (_settings.BlurEnabled) Win32.EnableAcrylic(_hwnd);
-        else Win32.DisableAcrylic(_hwnd);
+        Win32.DisableAcrylic(_hwnd); // 清掉旧版 ACCENT 残留（"卡片后面多个底"的源头）
+        if (_settings.BlurEnabled)
+        {
+            RefreshBlur();
+            _blurTimer.Tick -= BlurTimer_Tick;
+            _blurTimer.Tick += BlurTimer_Tick;
+            _blurTimer.Start();
+        }
+        else
+        {
+            _blurTimer.Stop();
+            ApplyBgDarkness(); // 回纯色面板
+        }
+    }
+
+    private void BlurTimer_Tick(object? sender, EventArgs e) => RefreshBlur();
+
+    private void RefreshBlur()
+    {
+        if (!_settings.BlurEnabled || _hwnd == IntPtr.Zero || _layer?.Mode == EmbedMode.WorkerW) return;
+        Win32.GetWindowRect(_hwnd, out var r);
+        var img = SelfBlur.CaptureBlurred(_hwnd, r);
+        if (img != null) RootBorder.Background = new ImageBrush(img) { Stretch = Stretch.Fill };
     }
 
     // ---------- 周几 tabs（代码构建，accent 感知） ----------
@@ -665,6 +690,7 @@ public partial class MainWindow : Window
         Left = _dragLogicalX; Top = _dragLogicalY; // 回写 DP 后吸附/持久化才有正确基准
         SnapToEdges();
         Persist();
+        if (_settings.BlurEnabled) RefreshBlur(); // 拖完重抓身后壁纸
     }
 
     private const double SnapDist = 20;
@@ -682,6 +708,7 @@ public partial class MainWindow : Window
         if (msg == WM_EXITSIZEMOVE)
         {
             Persist(); // 原生缩放/移动结束 → 尺寸位置落盘
+            if (_settings.BlurEnabled) RefreshBlur(); // 位置/尺寸变了 → 重抓身后壁纸
             return IntPtr.Zero;
         }
         if (msg != WM_NCHITTEST) return IntPtr.Zero;
@@ -728,10 +755,108 @@ public partial class MainWindow : Window
     private void SnapToEdges()
     {
         var wa = SystemParameters.WorkArea;
+        // ① 靠近边缘 20px → 吸附
         if (Math.Abs(Left - wa.Left) < SnapDist) Left = wa.Left + EdgeMargin;
         else if (Math.Abs(wa.Right - (Left + Width)) < SnapDist) Left = wa.Right - Width - EdgeMargin;
         if (Math.Abs(Top - wa.Top) < SnapDist) Top = wa.Top + EdgeMargin;
         else if (Math.Abs(wa.Bottom - (Top + Height)) < SnapDist) Top = wa.Bottom - Height - EdgeMargin;
+        // ② 拖出屏幕 → 强制回弹到屏内（v3.11.0：用户实测"超边不回弹"）
+        if (Left < wa.Left) Left = wa.Left + EdgeMargin;
+        if (Left + Width > wa.Right) Left = wa.Right - Width - EdgeMargin;
+        if (Top < wa.Top) Top = wa.Top + EdgeMargin;
+        if (Top + Height > wa.Bottom) Top = wa.Bottom - Height - EdgeMargin;
+        // ③ 记录停靠边（贴边隐藏用）：0=无 1=左 2=右 3=上（底边不藏，任务栏侧）
+        _dockEdge = 0;
+        if (Math.Abs(Left - (wa.Left + EdgeMargin)) < 2) _dockEdge = 1;
+        else if (Math.Abs(Left - (wa.Right - Width - EdgeMargin)) < 2) _dockEdge = 2;
+        else if (Math.Abs(Top - (wa.Top + EdgeMargin)) < 2) _dockEdge = 3;
+        if (_dockEdge == 0 && _edgeHidden) ShowFromEdge();
+        _dockX = Left; _dockY = Top;
+    }
+
+    // ---------- 自动沉降 + 贴边隐藏（200ms 交互轮询） ----------
+
+    private int _dockEdge;
+    private bool _edgeHidden;
+    private double _dockX, _dockY;
+    private bool _lmbWasDown;
+    private int _hideCountdown;
+
+    private void StartInteractionTimer()
+    {
+        var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
+        t.Tick += (_, _) => { AutoSinkTick(); EdgeHideTick(); };
+        t.Start();
+    }
+
+    /// <summary>点卡片浮上来（系统激活天然完成），点别处沉到桌面。
+    /// 优效等 NOACTIVATE 窗口被点不会触发我们失活 → 必须自己轮询点击沿+光标下根窗口。</summary>
+    private void AutoSinkTick()
+    {
+        if (!_settings.AutoSink || _hwnd == IntPtr.Zero || _layer?.Mode != EmbedMode.Normal) return;
+        if (_dragging || _resizing) return;
+        bool down = (Win32.GetAsyncKeyState(Win32.VK_LBUTTON) & 0x8000) != 0;
+        if (down && !_lmbWasDown) // 左键按下沿
+        {
+            Win32.GetCursorPos(out var pt);
+            var root = Win32.GetAncestor(Win32.WindowFromPoint(pt), Win32.GA_ROOT);
+            var settingsHwnd = _settingsWin?.IsVisible == true
+                ? new System.Windows.Interop.WindowInteropHelper(_settingsWin).Handle : IntPtr.Zero;
+            if (root != IntPtr.Zero && root != _hwnd && root != settingsHwnd)
+            {
+                Win32.SetWindowPos(_hwnd, Win32.HWND_BOTTOM, 0, 0, 0, 0,
+                    Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_NOACTIVATE);
+            }
+        }
+        _lmbWasDown = down;
+    }
+
+    private void EdgeHideTick()
+    {
+        if (_edgeHidden && (!_settings.EdgeHide || _layer?.Mode != EmbedMode.Normal || _dockEdge == 0))
+            ShowFromEdge(); // 设置关了/模式变了 → 先弹回来
+        if (!_settings.EdgeHide || _hwnd == IntPtr.Zero || _layer?.Mode != EmbedMode.Normal) return;
+        if (_dockEdge == 0 || _dragging || _resizing) return;
+
+        Win32.GetCursorPos(out var pt);
+        var dpi = VisualTreeHelper.GetDpi(this);
+        double cx = pt.X / dpi.DpiScaleX, cy = pt.Y / dpi.DpiScaleY;
+
+        if (!_edgeHidden)
+        {
+            // 光标离开窗口矩形（外扩 6px）连续 ~1s → 藏起来
+            bool over = cx >= Left - 6 && cx <= Left + Width + 6 && cy >= Top - 6 && cy <= Top + Height + 6;
+            if (over) { _hideCountdown = 5; return; }
+            if (--_hideCountdown > 0) return;
+            _hideCountdown = 0;
+            var wa = SystemParameters.WorkArea;
+            _dockX = Left; _dockY = Top;
+            if (_dockEdge == 1) Left = wa.Left - Width + 6;
+            else if (_dockEdge == 2) Left = wa.Right - 6;
+            else if (_dockEdge == 3) Top = wa.Top - Height + 6;
+            _edgeHidden = true;
+        }
+        else
+        {
+            // 光标探到露出的细条附近 → 滑回
+            var wa = SystemParameters.WorkArea;
+            bool near = _dockEdge switch
+            {
+                1 => cx <= wa.Left + 16 && cy >= _dockY - 8 && cy <= _dockY + Height + 8,
+                2 => cx >= wa.Right - 16 && cy >= _dockY - 8 && cy <= _dockY + Height + 8,
+                3 => cy <= wa.Top + 16 && cx >= _dockX - 8 && cx <= _dockX + Width + 8,
+                _ => false,
+            };
+            if (near) ShowFromEdge();
+        }
+    }
+
+    private void ShowFromEdge()
+    {
+        if (!_edgeHidden) return;
+        Left = _dockX; Top = _dockY;
+        _edgeHidden = false;
+        _hideCountdown = 8; // 刚滑出时给足宽限，别立刻又缩回去
     }
 
     // 手动缩放：WorkerW 子窗口下 WM_NCLBUTTONDOWN HTBOTTOMRIGHT 和 DragMove 一样失效

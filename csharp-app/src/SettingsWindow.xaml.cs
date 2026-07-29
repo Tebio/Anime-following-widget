@@ -63,6 +63,14 @@ public partial class SettingsWindow : Window
         FavOnlyCheck.Checked += (_, _) => { settings.FavoritesOnly = true; settings.Save(); ListRefreshNeeded?.Invoke(); };
         FavOnlyCheck.Unchecked += (_, _) => { settings.FavoritesOnly = false; settings.Save(); ListRefreshNeeded?.Invoke(); };
 
+        AutoSinkCheck.IsChecked = settings.AutoSink;
+        AutoSinkCheck.Checked += (_, _) => { settings.AutoSink = true; settings.Save(); };
+        AutoSinkCheck.Unchecked += (_, _) => { settings.AutoSink = false; settings.Save(); };
+
+        EdgeHideCheck.IsChecked = settings.EdgeHide;
+        EdgeHideCheck.Checked += (_, _) => { settings.EdgeHide = true; settings.Save(); };
+        EdgeHideCheck.Unchecked += (_, _) => { settings.EdgeHide = false; settings.Save(); };
+
         // 嵌入选项卡高亮
         UpdateEmbedCards();
 
