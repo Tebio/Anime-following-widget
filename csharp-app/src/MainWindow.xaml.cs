@@ -21,20 +21,11 @@ public partial class MainWindow : Window
     private DesktopLayer? _layer;
     private IntPtr _hwnd;
     private SettingsWindow? _settingsWin;
-    private readonly bool _isGlassWindow; // 本实例窗口技术：true=普通窗口+ACCENT玻璃 false=透明分层窗口+色板
 
     public MainWindow()
     {
         _settings = AppSettings.Load();
-        _isGlassWindow = EffectiveBlurMode > 0;
         InitializeComponent();
-        if (_isGlassWindow)
-        {
-            // 玻璃模式 = 普通窗口（优效公式：模糊只在非分层窗口上可靠）。
-            // AllowsTransparency 只能在 hwnd 创建前改——构造里翻牌。
-            AllowsTransparency = false;
-            RootBorder.Margin = new Thickness(0); // 普通窗口没有透明边距，窗口即卡片
-        }
         DataContext = _vm;
 
         // 还原窗口状态
@@ -249,56 +240,21 @@ public partial class MainWindow : Window
     private void ApplyBgDarkness()
     {
         // 双滑条正交：「窗口透明度」= 纯面板 alpha，「背景深浅」= 纯面板色相。
-        // 磨砂开启时这层色板必须撤掉（整卡即玻璃，由 ApplyBlur 走 ACCENT tint）——
-        // 否则就是用户投诉的"在原来的背景下面再加个磨砂的底"。
-        if (EffectiveBlurMode > 0) return;
         var d = Math.Clamp(_settings.BgDarkness, 0, 1);
         var v = (byte)(40 - d * 24);              // 40(#242838 优效色系) → 16(近黑)
         var a = (byte)Math.Min(255, 255 * Math.Clamp(_settings.WindowOpacity, 0.08, 1));
         RootBorder.Background = new SolidColorBrush(Color.FromArgb(a, (byte)(v - 4), v, (byte)(v + 16)));
     }
 
-    // ---------- 磨砂 v3.12.1：整卡即玻璃（抄优效三态：无/毛玻璃/亚克力） ----------
-    // 关键认知：磨砂开启时卡片"本体"就是玻璃——撤掉 WPF 色板(Background=Transparent)，
-    // ACCENT 模糊就是背景本身；两个滑条改为直接调 ACCENT 的 tint 参数：
-    //   透明度 → tint alpha（越不透明 tint 越重）
-    //   深浅   → tint 色相（亮蓝灰 ↔ 近黑）
-    // 系统级逐帧实时模糊：拖动实时透视零成本，不闪烁不卡顿。
-    // 圆角 Region（ApplyWindowRegion）保证模糊只糊卡片区域，没有矩形底。
-
-    private int EffectiveBlurMode => _settings.BlurMode != 0 ? _settings.BlurMode : (_settings.BlurEnabled ? 2 : 0);
+    // ---------- 磨砂已移除（v3.13.0） ----------
+    // 四条路线（自截屏/ACCENT叠透明窗/Region裁剪/普通窗口）全部实测输给普通模式——
+    // WPF 透明窗口架构做不出优效级玻璃（人家是 Direct2D 普通窗口栈），
+    // 追平=换渲染栈重写，成本收益不成比例。只保留 DisableAcrylic 清残留。
 
     private void ApplyBlur()
     {
         if (_hwnd == IntPtr.Zero) return;
-        var mode = EffectiveBlurMode;
-        if (mode > 0 && _isGlassWindow)
-        {
-            RootBorder.Background = System.Windows.Media.Brushes.Transparent; // 撤色板，玻璃即本体
-            var d = Math.Clamp(_settings.BgDarkness, 0, 1);
-            var v = (byte)(40 - d * 24);
-            var a = (byte)Math.Min(235, 40 + 195 * Math.Clamp(_settings.WindowOpacity, 0.08, 1));
-            // 毛玻璃(1)=BLURBEHIND 纯模糊（系统忽略 tint）；亚克力(2)=ACRYLIC tint 可调
-            Win32.SetBlur(_hwnd, mode, a, (byte)(v - 4), v, (byte)(v + 16));
-        }
-        else
-        {
-            Win32.SetBlur(_hwnd, 0, 0, 0, 0, 0);
-            if (!_isGlassWindow) ApplyBgDarkness(); // 透明窗口回纯色半透明面板
-        }
-    }
-
-    /// <summary>磨砂开/关横跨两种窗口技术（玻璃=普通窗口，色板=透明分层窗口），
-    /// AllowsTransparency 运行时不可切换 → 快速重建窗口（位置尺寸配置已持久化）。</summary>
-    private void RecreateForTechSwitch()
-    {
-        Win32.LayerLog($"窗口技术切换：玻璃={_isGlassWindow} → 目标 BlurMode={EffectiveBlurMode}，重建窗口");
-        Persist();
-        try { _settingsWin?.Close(); } catch { }
-        var nw = new MainWindow();
-        _current = nw;
-        nw.Show();
-        Close();
+        Win32.DisableAcrylic(_hwnd); // 清掉旧版本遗留的 ACCENT 状态
     }
 
     /// <summary>把窗口裁成 RootBorder 的圆角矩形（透明模式 Margin=6；玻璃模式窗口即卡片 Margin=0）。</summary>
@@ -309,7 +265,7 @@ public partial class MainWindow : Window
         int w = r.Right - r.Left, h = r.Bottom - r.Top;
         if (w < 20 || h < 20) return;
         var dpi = VisualTreeHelper.GetDpi(this);
-        int m = _isGlassWindow ? 0 : (int)Math.Round(6 * dpi.DpiScaleX);
+        int m = (int)Math.Round(6 * dpi.DpiScaleX);
         int rad = (int)Math.Round(15 * dpi.DpiScaleX) * 2; // CreateRoundRectRgn 要椭圆宽高
         var rgn = Win32.CreateRoundRectRgn(m, m, w - m + 1, h - m + 1, rad, rad);
         Win32.SetWindowRgn(_hwnd, rgn, true);
@@ -622,11 +578,9 @@ public partial class MainWindow : Window
         };
         _settingsWin.AppearanceChanged += () =>
         {
-            // 磨砂开/关横跨两种窗口技术 → 快速重建（AllowsTransparency 运行时不可切换）
-            if ((EffectiveBlurMode > 0) != _isGlassWindow) { RecreateForTechSwitch(); return; }
             ApplyAccent();
             ApplyBgDarkness(); // WindowOpacity=纯面板alpha、BgDarkness=纯色相
-            ApplyBlur();       // 磨砂 tint 即时生效
+            ApplyBlur();       // 磨砂开关即时生效
         };
         _settingsWin.EmbedModeChanged += mode =>
         {

@@ -32,11 +32,6 @@ public partial class SettingsWindow : Window
         // 外观
         OpacitySlider.Value = settings.WindowOpacity;
         DarknessSlider.Value = settings.BgDarkness;
-        // 界面效果三态（无/毛玻璃/亚克力），旧 BlurEnabled=true 迁移为亚克力
-        var blurSel = settings.BlurMode != 0 ? settings.BlurMode : (settings.BlurEnabled ? 2 : 0);
-        BuildPills(BlurPanel, new[] { "无", "毛玻璃", "亚克力" }, blurSel,
-            i => { _settings.BlurMode = i; _settings.BlurEnabled = i > 0; _settings.Save(); UpdateSliderState(i); AppearanceChanged?.Invoke(); });
-        UpdateSliderState(blurSel); // 毛玻璃=纯模糊(系统不支持 tint) → 滑条禁用
         BuildAccentSwatches();
 
         // 行为：分段胶囊（替代单选/下拉，所见即所得）
@@ -89,16 +84,6 @@ public partial class SettingsWindow : Window
     }
 
     // ---------- 强调色圆点（选中带描边环） ----------
-
-    /// <summary>毛玻璃=系统纯模糊（BLURBEHIND 不支持 tint）→ 透明度/深浅滑条禁用。</summary>
-    private void UpdateSliderState(int blurMode)
-    {
-        var enabled = blurMode != 1;
-        OpacitySlider.IsEnabled = enabled;
-        DarknessSlider.IsEnabled = enabled;
-        OpacityValue.Opacity = enabled ? 1 : 0.35;
-        DarknessValue.Opacity = enabled ? 1 : 0.35;
-    }
 
     private void BuildAccentSwatches()
     {
