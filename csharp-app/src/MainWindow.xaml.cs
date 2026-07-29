@@ -131,6 +131,8 @@ public partial class MainWindow : Window
     {
         base.OnSourceInitialized(e);
         _hwnd = new WindowInteropHelper(this).Handle;
+        _current = this;
+        ApplyWindowRegion(); // 圆角卡片裁剪（磨砂/无磨砂都裁：ACCENT 只糊卡片，边缘也干净）
         ApplyBlur(); // 磨砂与否由设置决定（默认关）
         HwndSource.FromHwnd(_hwnd)?.AddHook(WndProc); // 四边/四角原生拉伸 + 缩放结束持久化
         // 整理软件在运行时不挂 WorkerW（会被它们的桌面表面盖住/随父层隐藏消失）
@@ -140,6 +142,7 @@ public partial class MainWindow : Window
         ApplyTopmost();
         ApplyClickThrough();
         StartInteractionTimer(); // 自动沉降 + 贴边隐藏（200ms 轮询）
+        StartZombieWatchdog(); // hwnd 被连坐销毁自动重建（WorkerW 模式最后防线）
         SetupTray();
         if (blocked) WarnOrganizer();
         StartLayerWatchdog();
@@ -236,63 +239,41 @@ public partial class MainWindow : Window
 
     private void ApplyBgDarkness()
     {
-        // v3.10.x 起双滑条正交：「窗口透明度」= 纯面板 alpha，「背景深浅」= 纯面板色相。
-        // 磨砂开启时背景由自截屏模糊掌管（RefreshBlur），这里不覆盖。
-        if (_settings.BlurEnabled) return;
+        // 双滑条正交：「窗口透明度」= 纯面板 alpha，「背景深浅」= 纯面板色相。
+        // 磨砂开启时这层半透明刷叠在系统亚克力上当 tint——两个设置天然兼容。
         var d = Math.Clamp(_settings.BgDarkness, 0, 1);
         var v = (byte)(40 - d * 24);              // 40(#242838 优效色系) → 16(近黑)
         var a = (byte)Math.Min(255, 255 * Math.Clamp(_settings.WindowOpacity, 0.08, 1));
         RootBorder.Background = new SolidColorBrush(Color.FromArgb(a, (byte)(v - 4), v, (byte)(v + 16)));
     }
 
-    // ---------- 自截屏磨砂（v3.11.0 替代系统 ACCENT——后者对透明 WPF 窗口要么失效要么"加个底"） ----------
-
-    private readonly DispatcherTimer _blurTimer = new() { Interval = TimeSpan.FromSeconds(5) };
+    // ---------- 磨砂 v3.12.0：圆角 Region 裁剪 + 系统 ACCENT 亚克力 ----------
+    // 之前误诊"ACCENT 对透明 WPF 窗口静默失效"——用户 v3.9.x 实测"磨砂质感"可见，
+    // 它一直在渲染，只是作用于整个窗口矩形（卡片后面多个矩形底="加个底"）。
+    // 正解：SetWindowRgn 把窗口裁成圆角卡片形状（对分层窗口同样有效），
+    // ACCENT 就只糊卡片区域——系统级逐帧实时模糊，零 CPU 零闪烁零抓取。
+    // 自截屏方案（SelfBlur）已废弃删除。
 
     private void ApplyBlur()
     {
         if (_hwnd == IntPtr.Zero) return;
-        Win32.DisableAcrylic(_hwnd); // 清掉旧版 ACCENT 残留（"卡片后面多个底"的源头）
-        if (_settings.BlurEnabled)
-        {
-            RefreshBlur();
-            _blurTimer.Tick -= BlurTimer_Tick;
-            _blurTimer.Tick += BlurTimer_Tick;
-            _blurTimer.Start();
-        }
-        else
-        {
-            _blurTimer.Stop();
-            ApplyBgDarkness(); // 回纯色面板
-        }
+        if (_settings.BlurEnabled) Win32.EnableAcrylic(_hwnd);  // 22% 轻 tint 亚克力，Region 裁形
+        else Win32.DisableAcrylic(_hwnd);
+        ApplyBgDarkness(); // 面板刷照叠：磨砂开=当 tint，磨砂关=纯色半透明
     }
 
-    private void BlurTimer_Tick(object? sender, EventArgs e) => RefreshBlur();
-
-    // 抓取+模糊全在后台线程（v3.11.1 的 50ms 等待在 UI 线程 = 用户实测"移动会卡顿"），
-    // UI 线程只换刷子；拖动中 120ms 节流实时刷新 ≈ 优效"透视随时更新"的体感。
-    private bool _blurBusy;
-    private DateTime _lastBlurAt = DateTime.MinValue;
-
-    private void RefreshBlur(bool throttle = false)
+    /// <summary>把窗口裁成 RootBorder 的圆角矩形（窗口 Margin=6，卡片 CornerRadius=14）。</summary>
+    private void ApplyWindowRegion()
     {
-        if (!_settings.BlurEnabled || _hwnd == IntPtr.Zero || _layer?.Mode == EmbedMode.WorkerW) return;
-        if (_blurBusy) return;
-        if (throttle && (DateTime.UtcNow - _lastBlurAt).TotalMilliseconds < 120) return;
-        _blurBusy = true;
-        _lastBlurAt = DateTime.UtcNow;
-        var hwnd = _hwnd;
-        Win32.GetWindowRect(hwnd, out var r);
-        System.Threading.Tasks.Task.Run(() =>
-        {
-            var img = SelfBlur.CaptureBlurred(hwnd, r);
-            Dispatcher.Invoke(() =>
-            {
-                _blurBusy = false;
-                if (img != null && _settings.BlurEnabled)
-                    RootBorder.Background = new ImageBrush(img) { Stretch = Stretch.Fill };
-            });
-        });
+        if (_hwnd == IntPtr.Zero) return;
+        Win32.GetWindowRect(_hwnd, out var r);
+        int w = r.Right - r.Left, h = r.Bottom - r.Top;
+        if (w < 20 || h < 20) return;
+        var dpi = VisualTreeHelper.GetDpi(this);
+        int m = (int)Math.Round(6 * dpi.DpiScaleX);
+        int rad = (int)Math.Round(15 * dpi.DpiScaleX) * 2; // CreateRoundRectRgn 要椭圆宽高
+        var rgn = Win32.CreateRoundRectRgn(m, m, w - m + 1, h - m + 1, rad, rad);
+        Win32.SetWindowRgn(_hwnd, rgn, true);
     }
 
     // ---------- 周几 tabs（代码构建，accent 感知） ----------
@@ -688,7 +669,6 @@ public partial class MainWindow : Window
         Win32.SetWindowPos(_hwnd, IntPtr.Zero,
             (int)Math.Round(_dragLogicalX * sx), (int)Math.Round(_dragLogicalY * sy), 0, 0,
             Win32.SWP_NOSIZE | Win32.SWP_NOZORDER | Win32.SWP_NOACTIVATE);
-        if (_settings.BlurEnabled) RefreshBlur(throttle: true); // 拖动中实时透视（后台线程不卡）
     }
 
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
@@ -709,7 +689,6 @@ public partial class MainWindow : Window
         Left = _dragLogicalX; Top = _dragLogicalY; // 回写 DP 后吸附/持久化才有正确基准
         SnapToEdges();
         Persist();
-        if (_settings.BlurEnabled) RefreshBlur(); // 拖完重抓身后壁纸
     }
 
     private const double SnapDist = 20;
@@ -721,20 +700,19 @@ public partial class MainWindow : Window
     // WorkerW 子窗口的非客户消息不可靠，该模式仍用右下角手柄（Grip_Resize）。
     private const int WM_NCHITTEST = 0x0084;
     private const int WM_EXITSIZEMOVE = 0x0232;
-    private const int WM_MOVING = 0x0216;
-    private const int WM_SIZING = 0x0214;
+    private const int WM_SIZE = 0x0005;
 
     private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
     {
         if (msg == WM_EXITSIZEMOVE)
         {
             Persist(); // 原生缩放/移动结束 → 尺寸位置落盘
-            if (_settings.BlurEnabled) RefreshBlur(); // 位置/尺寸变了 → 重抓身后壁纸
+            ApplyWindowRegion(); // 尺寸变了 → 重裁圆角
             return IntPtr.Zero;
         }
-        if ((msg == WM_MOVING || msg == WM_SIZING) && _settings.BlurEnabled)
+        if (msg == WM_SIZE)
         {
-            RefreshBlur(throttle: true); // 原生拖动/缩放中也实时透视
+            ApplyWindowRegion(); // 任何尺寸变化（含程序化）都要重裁
             return IntPtr.Zero;
         }
         if (msg != WM_NCHITTEST) return IntPtr.Zero;
@@ -798,6 +776,30 @@ public partial class MainWindow : Window
         else if (Math.Abs(Top - (wa.Top + EdgeMargin)) < 2) _dockEdge = 3;
         if (_dockEdge == 0 && _edgeHidden) ShowFromEdge();
         _dockX = Left; _dockY = Top;
+    }
+
+    // ---------- 僵尸自愈看门狗（v3.12.0） ----------
+    // WorkerW 模式下父层被整理软件重建 → 我们的 hwnd 连坐销毁（WPF 无法自救）。
+    // 5s 巡检：句柄死了就重建 MainWindow——启动守卫会让新窗口落回普通模式保持可见。
+    // "消失救不回，只能重启" 从结构上消灭。
+    private static MainWindow? _current;
+    private static DispatcherTimer? _zombieDog;
+
+    private void StartZombieWatchdog()
+    {
+        if (_zombieDog != null) return;
+        _zombieDog = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _zombieDog.Tick += (_, _) =>
+        {
+            var cur = _current;
+            if (cur == null || cur._hwnd == IntPtr.Zero || !cur.IsLoaded) return; // 未初始化/正常退出不管
+            if (Win32.IsWindow(cur._hwnd)) return;
+            Win32.LayerLog("僵尸检测：hwnd 已被销毁（WorkerW 父层连坐），自动重建窗口");
+            var nw = new MainWindow();
+            _current = nw;
+            nw.Show();
+        };
+        _zombieDog.Start();
     }
 
     // ---------- 自动沉降 + 贴边隐藏（200ms 交互轮询） ----------

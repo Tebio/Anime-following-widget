@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 
 namespace AnimeWidget;
@@ -50,10 +51,12 @@ public class DesktopLayer
 
     public void SetMode(EmbedMode mode)
     {
+        Win32.LayerLog($"SetMode({mode}) 当前={Mode} hwnd有效={Win32.IsWindow(_hwnd)} 整理软件={OrganizerDetect.AnyRunning()}");
         switch (mode)
         {
             case EmbedMode.WorkerW:
                 var workerw = FindWorkerW();
+                Win32.LayerLog($"  FindWorkerW={(workerw == IntPtr.Zero ? "未找到/非explorer" : workerw.ToString())}");
                 if (workerw != IntPtr.Zero)
                 {
                     long style = Win32.GetStyle(_hwnd);
@@ -65,8 +68,10 @@ public class DesktopLayer
                         Win32.SetWindowPos(_hwnd, IntPtr.Zero, 0, 0, 0, 0,
                             Win32.SWP_NOMOVE | Win32.SWP_NOSIZE | Win32.SWP_FRAMECHANGED | Win32.SWP_SHOWWINDOW);
                         Win32.ShowWindow(_hwnd, Win32.SW_SHOW);
+                        Win32.LayerLog("  挂接 WorkerW 成功");
                         return;
                     }
+                    Win32.LayerLog("  SetParent 失败 → 降级置底");
                 }
                 ForceBottomPin(); // 找不到/挂不上 → 降级置底
                 break;
@@ -195,6 +200,22 @@ internal static class Win32
     [DllImport("user32.dll")] public static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint dwAffinity);
     public const uint WDA_NONE = 0x0;
     public const uint WDA_EXCLUDEFROMCAPTURE = 0x11;
+
+    [DllImport("gdi32.dll")] public static extern IntPtr CreateRoundRectRgn(int x1, int y1, int x2, int y2, int w, int h);
+    [DllImport("user32.dll")] public static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, bool bRedraw);
+
+    /// <summary>窗口层诊断日志（%APPDATA%\AnimeFollowingWidget\layer.log）——"又不见了"类问题下次直接读日志。</summary>
+    public static void LayerLog(string msg)
+    {
+        try
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AnimeFollowingWidget");
+            Directory.CreateDirectory(dir);
+            File.AppendAllText(Path.Combine(dir, "layer.log"),
+                $"{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff} {msg}{Environment.NewLine}");
+        }
+        catch { }
+    }
 
     public const uint GA_ROOT = 2;
     public const int VK_LBUTTON = 0x01;
