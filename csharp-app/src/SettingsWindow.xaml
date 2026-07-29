@@ -3,9 +3,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:AnimeWidget"
         Title="设置" Width="400" Height="680"
-        Background="#F0161A22" Foreground="#EDEDF2"
+        Background="#FF161A22" Foreground="#EDEDF2"
         FontFamily="Microsoft YaHei UI"
-        WindowStartupLocation="CenterOwner" ResizeMode="NoResize">
+        WindowStyle="None" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner">
     <Window.Resources>
         <SolidColorBrush x:Key="SubBrush" Color="#B9BEC9"/>
         <SolidColorBrush x:Key="DimBrush" Color="#8B91A0"/>
@@ -92,9 +93,54 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- 自定义标题栏关闭按钮：hover 变红 -->
+        <Style x:Key="TitleCloseBtn" TargetType="Button">
+            <Setter Property="Width" Value="40"/>
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#B9BEC9"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="#E81123"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto">
+    <!-- 无边框窗口：自绘深色标题栏（优效同款），去掉系统白条的违和感。
+         不用 AllowsTransparency（保住 ClearType），代价是直角——商业软件多数也直角 -->
+    <Border BorderBrush="#2E3947" BorderThickness="1">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="36"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <Border Background="#FF12151B" MouseLeftButtonDown="Header_Drag">
+                <Grid>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="13,0,0,0">
+                        <Ellipse Width="8" Height="8" Fill="{StaticResource AccentBrush}"/>
+                        <TextBlock Text="设置" FontSize="12.5" FontWeight="SemiBold"
+                                   Margin="8,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <Button Content="&#x2715;" Style="{StaticResource TitleCloseBtn}"
+                            HorizontalAlignment="Right" Click="CloseBtn_Click"/>
+                </Grid>
+            </Border>
+
+    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="18,14">
 
             <!-- 外观 -->
@@ -216,4 +262,6 @@
             <Button Content="完成" Style="{StaticResource AccentBtn}" Padding="0,8" Click="Done_Click"/>
         </StackPanel>
     </ScrollViewer>
+        </Grid>
+    </Border>
 </Window>

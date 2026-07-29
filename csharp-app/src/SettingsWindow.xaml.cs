@@ -207,5 +207,14 @@ public partial class SettingsWindow : Window
 
     private void RefreshNow_Click(object sender, RoutedEventArgs e) => _sched.RefreshNow();
 
+    // ---------- 自定义标题栏 ----------
+
+    private void Header_Drag(object sender, MouseButtonEventArgs e)
+    {
+        if (e.LeftButton == MouseButtonState.Pressed) DragMove();
+    }
+
+    private void CloseBtn_Click(object sender, RoutedEventArgs e) => Close();
+
     private void Done_Click(object sender, RoutedEventArgs e) => Close();
 }
