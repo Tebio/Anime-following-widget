@@ -66,6 +66,8 @@ public class AppSettings
     public double BgDarkness { get; set; } = 0.55;
     /// <summary>磨砂背景（系统亚克力）。默认关：干净单层卡片，用户自选。</summary>
     public bool BlurEnabled { get; set; } = false;
+    /// <summary>界面效果：0=无 1=毛玻璃 2=亚克力（v3.12.1 起取代 BlurEnabled；旧值 true 迁移为 2）。</summary>
+    public int BlurMode { get; set; } = 0;
     /// <summary>自动沉降：点卡片浮到最上，点别处沉到桌面（对齐优效等插件的层级交互）。</summary>
     public bool AutoSink { get; set; } = true;
     /// <summary>贴边隐藏：贴到屏幕边缘后缩成细条，鼠标靠近滑出。</summary>

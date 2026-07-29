@@ -270,6 +270,15 @@ internal static class Win32
     public static void EnableAcrylic(IntPtr hwnd) => SetAccent(hwnd, 4, 2, unchecked((int)0x381E1410)); // 22% 轻 tint
     public static void DisableAcrylic(IntPtr hwnd) => SetAccent(hwnd, 0, 0, 0); // ACCENT_DISABLED
 
+    /// <summary>界面效果三态（同优效：无/毛玻璃/亚克力），tint 由调用方按滑条算好。</summary>
+    public static void SetBlur(IntPtr hwnd, int mode, byte alpha, byte red, byte green, byte blue)
+    {
+        if (mode <= 0) { DisableAcrylic(hwnd); return; }
+        // state: 3=ACCENT_ENABLE_BLURBEHIND(毛玻璃) 4=ACRYLICBLURBEHIND(亚克力); gradient=ABGR
+        int gradient = (alpha << 24) | (blue << 16) | (green << 8) | red;
+        SetAccent(hwnd, mode == 1 ? 3 : 4, 2, gradient);
+    }
+
     private static void SetAccent(IntPtr hwnd, int state, int flags, int gradientColor)
     {
         try

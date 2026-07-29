@@ -240,26 +240,42 @@ public partial class MainWindow : Window
     private void ApplyBgDarkness()
     {
         // 双滑条正交：「窗口透明度」= 纯面板 alpha，「背景深浅」= 纯面板色相。
-        // 磨砂开启时这层半透明刷叠在系统亚克力上当 tint——两个设置天然兼容。
+        // 磨砂开启时这层色板必须撤掉（整卡即玻璃，由 ApplyBlur 走 ACCENT tint）——
+        // 否则就是用户投诉的"在原来的背景下面再加个磨砂的底"。
+        if (EffectiveBlurMode > 0) return;
         var d = Math.Clamp(_settings.BgDarkness, 0, 1);
         var v = (byte)(40 - d * 24);              // 40(#242838 优效色系) → 16(近黑)
         var a = (byte)Math.Min(255, 255 * Math.Clamp(_settings.WindowOpacity, 0.08, 1));
         RootBorder.Background = new SolidColorBrush(Color.FromArgb(a, (byte)(v - 4), v, (byte)(v + 16)));
     }
 
-    // ---------- 磨砂 v3.12.0：圆角 Region 裁剪 + 系统 ACCENT 亚克力 ----------
-    // 之前误诊"ACCENT 对透明 WPF 窗口静默失效"——用户 v3.9.x 实测"磨砂质感"可见，
-    // 它一直在渲染，只是作用于整个窗口矩形（卡片后面多个矩形底="加个底"）。
-    // 正解：SetWindowRgn 把窗口裁成圆角卡片形状（对分层窗口同样有效），
-    // ACCENT 就只糊卡片区域——系统级逐帧实时模糊，零 CPU 零闪烁零抓取。
-    // 自截屏方案（SelfBlur）已废弃删除。
+    // ---------- 磨砂 v3.12.1：整卡即玻璃（抄优效三态：无/毛玻璃/亚克力） ----------
+    // 关键认知：磨砂开启时卡片"本体"就是玻璃——撤掉 WPF 色板(Background=Transparent)，
+    // ACCENT 模糊就是背景本身；两个滑条改为直接调 ACCENT 的 tint 参数：
+    //   透明度 → tint alpha（越不透明 tint 越重）
+    //   深浅   → tint 色相（亮蓝灰 ↔ 近黑）
+    // 系统级逐帧实时模糊：拖动实时透视零成本，不闪烁不卡顿。
+    // 圆角 Region（ApplyWindowRegion）保证模糊只糊卡片区域，没有矩形底。
+
+    private int EffectiveBlurMode => _settings.BlurMode != 0 ? _settings.BlurMode : (_settings.BlurEnabled ? 2 : 0);
 
     private void ApplyBlur()
     {
         if (_hwnd == IntPtr.Zero) return;
-        if (_settings.BlurEnabled) Win32.EnableAcrylic(_hwnd);  // 22% 轻 tint 亚克力，Region 裁形
-        else Win32.DisableAcrylic(_hwnd);
-        ApplyBgDarkness(); // 面板刷照叠：磨砂开=当 tint，磨砂关=纯色半透明
+        var mode = EffectiveBlurMode;
+        if (mode > 0)
+        {
+            RootBorder.Background = System.Windows.Media.Brushes.Transparent; // 撤色板，玻璃即本体
+            var d = Math.Clamp(_settings.BgDarkness, 0, 1);
+            var v = (byte)(40 - d * 24);
+            var a = (byte)Math.Min(235, 40 + 195 * Math.Clamp(_settings.WindowOpacity, 0.08, 1));
+            Win32.SetBlur(_hwnd, mode, a, (byte)(v - 4), v, (byte)(v + 16));
+        }
+        else
+        {
+            Win32.SetBlur(_hwnd, 0, 0, 0, 0, 0);
+            ApplyBgDarkness(); // 回纯色半透明面板
+        }
     }
 
     /// <summary>把窗口裁成 RootBorder 的圆角矩形（窗口 Margin=6，卡片 CornerRadius=14）。</summary>

@@ -32,9 +32,10 @@ public partial class SettingsWindow : Window
         // 外观
         OpacitySlider.Value = settings.WindowOpacity;
         DarknessSlider.Value = settings.BgDarkness;
-        BlurCheck.IsChecked = settings.BlurEnabled;
-        BlurCheck.Checked += (_, _) => { settings.BlurEnabled = true; settings.Save(); AppearanceChanged?.Invoke(); };
-        BlurCheck.Unchecked += (_, _) => { settings.BlurEnabled = false; settings.Save(); AppearanceChanged?.Invoke(); };
+        // 界面效果三态（无/毛玻璃/亚克力），旧 BlurEnabled=true 迁移为亚克力
+        var blurSel = settings.BlurMode != 0 ? settings.BlurMode : (settings.BlurEnabled ? 2 : 0);
+        BuildPills(BlurPanel, new[] { "无", "毛玻璃", "亚克力" }, blurSel,
+            i => { _settings.BlurMode = i; _settings.BlurEnabled = i > 0; _settings.Save(); AppearanceChanged?.Invoke(); });
         BuildAccentSwatches();
 
         // 行为：分段胶囊（替代单选/下拉，所见即所得）

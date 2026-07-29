@@ -176,9 +176,11 @@
                     </Slider>
                     <TextBlock Text="面板颜色：浅蓝灰 ↔ 深黑" FontSize="10"
                                Foreground="{StaticResource DimBrush}" Margin="0,0,0,8"/>
-                    <CheckBox x:Name="BlurCheck" Style="{StaticResource Switch}" Content="磨砂背景（自截屏模糊）"/>
-                    <TextBlock Text="把身后壁纸模糊后当卡片底，全 Windows 版本可用" FontSize="10"
-                               Foreground="{StaticResource DimBrush}" Margin="43,0,0,6"/>
+                    <TextBlock Text="界面效果（整卡即玻璃）" FontSize="12" Margin="0,8,0,6"/>
+                    <StackPanel x:Name="BlurPanel" Orientation="Horizontal"/>
+                    <TextBlock Text="毛玻璃=纯模糊；亚克力=带噪点纹理的浓模糊（同优效）。开启后透明度/深浅滑条直接调玻璃本身"
+                               FontSize="10" TextWrapping="Wrap"
+                               Foreground="{StaticResource DimBrush}" Margin="0,4,0,6"/>
                     <TextBlock Text="强调色" FontSize="12" Margin="0,8,0,6"/>
                     <StackPanel x:Name="AccentPanel" Orientation="Horizontal"/>
                     <TextBlock Text="高亮颜色：今天、收藏星、按钮" FontSize="10"
