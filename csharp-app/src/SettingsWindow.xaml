@@ -34,7 +34,7 @@
                         </StackPanel>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Track" Property="Background" Value="#2BA8A0"/>
+                                <Setter TargetName="Track" Property="Background" Value="{StaticResource AccentBrush}"/>
                                 <Setter TargetName="Knob" Property="Background" Value="White"/>
                                 <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/>
                             </Trigger>
@@ -50,7 +50,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Thumb">
                         <Ellipse Width="14" Height="14" Fill="White"
-                                 Stroke="#2BA8A0" StrokeThickness="2"/>
+                                 Stroke="{StaticResource AccentBrush}" StrokeThickness="2"/>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -144,7 +144,11 @@
         <StackPanel Margin="18,14">
 
             <!-- 外观 -->
-            <TextBlock Text="外观" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DimBrush}"/>
+            <StackPanel Orientation="Horizontal">
+                <Border Width="3" Height="11" CornerRadius="1.5" Background="{StaticResource AccentBrush}"
+                        VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <TextBlock Text="外观" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DimBrush}"/>
+            </StackPanel>
             <Border Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12" Margin="0,6,0,12">
                 <StackPanel>
                     <Grid>
@@ -184,7 +188,11 @@
             </Border>
 
             <!-- 行为 -->
-            <TextBlock Text="行为" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DimBrush}"/>
+            <StackPanel Orientation="Horizontal">
+                <Border Width="3" Height="11" CornerRadius="1.5" Background="{StaticResource AccentBrush}"
+                        VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <TextBlock Text="行为" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DimBrush}"/>
+            </StackPanel>
             <Border Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12" Margin="0,6,0,12">
                 <StackPanel>
                     <TextBlock Text="点击番名打开" FontSize="12" Margin="0,0,0,6"/>
@@ -217,7 +225,11 @@
             </Border>
 
             <!-- 桌面嵌入：选项卡式（长文本自动换行，不再截断） -->
-            <TextBlock Text="桌面嵌入" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DimBrush}"/>
+            <StackPanel Orientation="Horizontal">
+                <Border Width="3" Height="11" CornerRadius="1.5" Background="{StaticResource AccentBrush}"
+                        VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <TextBlock Text="桌面嵌入" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DimBrush}"/>
+            </StackPanel>
             <StackPanel Margin="0,6,0,12">
                 <Border x:Name="EmbedCardNormal" Background="{StaticResource CardBrush}" CornerRadius="12"
                         Padding="12,10" Margin="0,0,0,6" Cursor="Hand"
@@ -249,7 +261,11 @@
             </StackPanel>
 
             <!-- 数据诊断 -->
-            <TextBlock Text="数据" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DimBrush}"/>
+            <StackPanel Orientation="Horizontal">
+                <Border Width="3" Height="11" CornerRadius="1.5" Background="{StaticResource AccentBrush}"
+                        VerticalAlignment="Center" Margin="0,0,6,0"/>
+                <TextBlock Text="数据" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DimBrush}"/>
+            </StackPanel>
             <Border Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12" Margin="0,6,0,10">
                 <StackPanel>
                     <TextBlock x:Name="ProxyText" FontSize="11" Foreground="{StaticResource SubBrush}"/>

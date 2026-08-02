@@ -11,8 +11,9 @@ public partial class SettingsWindow : Window
     private readonly ScheduleService _sched;
     private bool _ready;
 
-    private static readonly Color AccentColor = Color.FromRgb(0x2B, 0xA8, 0xA0);
-    private static readonly Brush AccentBrush = new SolidColorBrush(AccentColor);
+    // 强调色画刷：唯一实例 + 换色只改 .Color，所有引用处（代码构建的胶囊/圆环/卡片描边、
+    // XAML 里 StaticResource 已解析的同一对象）全部实时联动 —— 设置页跟随主题色，不再焊死青色。
+    private readonly SolidColorBrush AccentBrush;
     private static readonly Brush PillOffBrush = new SolidColorBrush(Color.FromArgb(0x26, 0xFF, 0xFF, 0xFF));
     private static readonly Brush PillTextOff = new SolidColorBrush(Color.FromRgb(0xDD, 0xE1, 0xEA));
 
@@ -28,6 +29,11 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         _settings = settings;
         _sched = sched;
+
+        // 用当前主题色初始化唯一画刷实例，并覆盖 XAML 默认资源（同一对象，后续改 .Color 即全局联动）
+        var (_, ar, ag, ab) = AppSettings.Accents[Math.Clamp(settings.Accent, 0, AppSettings.Accents.Length - 1)];
+        AccentBrush = new SolidColorBrush(Color.FromRgb(ar, ag, ab));
+        Resources["AccentBrush"] = AccentBrush;
 
         // 外观
         OpacitySlider.Value = settings.WindowOpacity;
@@ -71,6 +77,13 @@ public partial class SettingsWindow : Window
         // 嵌入选项卡高亮
         UpdateEmbedCards();
 
+        // 嵌入选项卡 hover 反馈（优效同款：悬停微亮，移开还原）
+        foreach (var card in new[] { EmbedCardNormal, EmbedCardWorkerW, EmbedCardBottomPin })
+        {
+            card.MouseEnter += EmbedCard_Hover;
+            card.MouseLeave += EmbedCard_Unhover;
+        }
+
         // 数据
         ProxyText.Text = $"代理：{sched.ProxyDesc}";
         SourceTextDiag.Text = sched.Current != null
@@ -112,6 +125,7 @@ public partial class SettingsWindow : Window
             {
                 _settings.Accent = idx;
                 _settings.Save();
+                AccentBrush.Color = Color.FromRgb(r, g, b); // 单实例换色，全设置页实时跟随
                 BuildAccentSwatches(); // 重排选中环
                 AppearanceChanged?.Invoke();
             };
@@ -151,6 +165,19 @@ public partial class SettingsWindow : Window
     }
 
     // ---------- 嵌入选项卡 ----------
+
+    private static readonly Brush CardRestBrush = new SolidColorBrush(Color.FromArgb(0x0A, 0xFF, 0xFF, 0xFF));
+    private static readonly Brush CardHoverBrush = new SolidColorBrush(Color.FromArgb(0x16, 0xFF, 0xFF, 0xFF));
+
+    private void EmbedCard_Hover(object sender, MouseEventArgs e)
+    {
+        if (sender is Border b) b.Background = CardHoverBrush;
+    }
+
+    private void EmbedCard_Unhover(object sender, MouseEventArgs e)
+    {
+        if (sender is Border b) b.Background = CardRestBrush;
+    }
 
     private void EmbedCard_Click(object sender, MouseButtonEventArgs e)
     {

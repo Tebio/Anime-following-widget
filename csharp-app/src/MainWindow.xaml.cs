@@ -332,6 +332,23 @@ public partial class MainWindow : Window
             var idx = (int)child.Tag;
             var sp = (StackPanel)child.Child;
             var txt = (TextBlock)sp.Children[0];
+            // 今日圆点按 TodayIndex 动态增删（根治：原只在 BuildTabs 贴一次，跨天不挪窝）
+            var shouldHaveDot = idx == _vm.TodayIndex;
+            var hasDot = sp.Children.Count > 1;
+            if (shouldHaveDot && !hasDot)
+            {
+                sp.Children.Add(new TextBlock
+                {
+                    Text = " •",
+                    FontSize = 12,
+                    Foreground = _vm.AccentBrush,
+                    VerticalAlignment = VerticalAlignment.Center,
+                });
+            }
+            else if (!shouldHaveDot && hasDot)
+            {
+                sp.Children.RemoveAt(1);
+            }
             // 今日圆点跟随强调色（修复切换强调色后圆点保持旧色）
             if (sp.Children.Count > 1 && sp.Children[1] is TextBlock dot)
                 dot.Foreground = _vm.AccentBrush;
