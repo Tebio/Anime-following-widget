@@ -825,17 +825,29 @@ public partial class MainWindow : Window
     private void StartInteractionTimer()
     {
         var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
-        t.Tick += (_, _) => { AutoSinkTick(); EdgeHideTick(); HoverRevealTick(); };
+        t.Tick += (_, _) => { AutoSinkTick(); EdgeHideTick(); };
         t.Start();
+        // 隐身模式独立 100ms 轮询：检测延迟减半，浮现更跟手
+        var ht = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(100) };
+        ht.Tick += (_, _) => HoverRevealTick();
+        ht.Start();
     }
 
-    /// <summary>隐身模式（酷呆同款）：光标离开卡片区域 → 整窗渐隐到全透；探入 → 渐显。
-    /// 全局轮询光标而非 MouseEnter——ClickThrough/WorkerW 嵌入下窗口收不到鼠标事件，照样可用。</summary>
+    /// <summary>隐身模式（酷呆同款）：光标离开卡片区域 → 渐隐到全透；探入 → 浮现。
+    /// 全局轮询光标而非 MouseEnter——ClickThrough/WorkerW 嵌入下窗口收不到鼠标事件，照样可用。
+    /// 动画走 WPF 原生 DoubleAnimation（渲染线程合成 60fps），不再手动步进（5fps 卡顿的根源）。</summary>
+    private double _hoverTarget = 1.0; // 上次的动画目标，没变就不重启动画
+
     private void HoverRevealTick()
     {
         if (!_settings.HoverReveal)
         {
-            if (Math.Abs(Opacity - 1.0) > 0.001) Opacity = 1.0; // 关了立即恢复
+            if (_hoverTarget != 1.0 || Math.Abs(Opacity - 1.0) > 0.001)
+            {
+                _hoverTarget = 1.0;
+                BeginAnimation(OpacityProperty, null);
+                Opacity = 1.0; // 关了立即恢复
+            }
             return;
         }
         if (_dragging || _resizing || _hwnd == IntPtr.Zero) return;
@@ -846,8 +858,14 @@ public partial class MainWindow : Window
         bool over = (cx >= Left - 4 && cx <= Left + Width + 4 && cy >= Top - 4 && cy <= Top + Height + 4)
                     || _settingsWin?.IsVisible == true;
         var target = over ? 1.0 : 0.0;
-        if (Math.Abs(Opacity - target) < 0.01) { Opacity = target; return; }
-        Opacity += (target - Opacity) * 0.35; // 200ms 轮询 × 指数趋近 ≈ 1s 内平滑隐/显
+        if (Math.Abs(target - _hoverTarget) < 0.001) return;
+        _hoverTarget = target;
+        BeginAnimation(OpacityProperty, new System.Windows.Media.Animation.DoubleAnimation(
+            target, TimeSpan.FromMilliseconds(180))
+        {
+            EasingFunction = new System.Windows.Media.Animation.QuadraticEase
+                { EasingMode = System.Windows.Media.Animation.EasingMode.EaseOut },
+        });
     }
 
     /// <summary>点卡片浮上来（系统激活天然完成），点别处沉到桌面。
