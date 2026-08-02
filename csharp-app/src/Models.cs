@@ -72,6 +72,8 @@ public class AppSettings
     public bool AutoSink { get; set; } = true;
     /// <summary>贴边隐藏：贴到屏幕边缘后缩成细条，鼠标靠近滑出。</summary>
     public bool EdgeHide { get; set; } = false;
+    /// <summary>隐身模式（酷呆同款）：平时完全透明，鼠标探到卡片所在区域才浮现。</summary>
+    public bool HoverReveal { get; set; } = false;
     public bool Locked { get; set; } = false;
     public bool ClickThrough { get; set; } = false;
     public bool Topmost { get; set; } = false;

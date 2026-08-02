@@ -74,6 +74,10 @@ public partial class SettingsWindow : Window
         EdgeHideCheck.Checked += (_, _) => { settings.EdgeHide = true; settings.Save(); };
         EdgeHideCheck.Unchecked += (_, _) => { settings.EdgeHide = false; settings.Save(); };
 
+        HoverRevealCheck.IsChecked = settings.HoverReveal;
+        HoverRevealCheck.Checked += (_, _) => { settings.HoverReveal = true; settings.Save(); };
+        HoverRevealCheck.Unchecked += (_, _) => { settings.HoverReveal = false; settings.Save(); };
+
         // 嵌入选项卡高亮
         UpdateEmbedCards();
 

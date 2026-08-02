@@ -221,6 +221,9 @@
                     <CheckBox x:Name="EdgeHideCheck" Style="{StaticResource Switch}" Content="贴边隐藏"/>
                     <TextBlock Text="拖到屏幕边缘后缩成一条细边，鼠标靠近自动滑出" FontSize="10"
                                Foreground="{StaticResource DimBrush}" Margin="43,0,0,4"/>
+                    <CheckBox x:Name="HoverRevealCheck" Style="{StaticResource Switch}" Content="隐身模式（鼠标移到卡片位置才显示）"/>
+                    <TextBlock Text="平时完全透明，鼠标探到它所在区域就浮现；找不到卡片时右键托盘图标开设置" FontSize="10"
+                               Foreground="{StaticResource DimBrush}" Margin="43,0,0,4"/>
                 </StackPanel>
             </Border>
 
