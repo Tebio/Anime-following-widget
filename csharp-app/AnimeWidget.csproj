@@ -9,10 +9,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AnimeWidget</RootNamespace>
     <AssemblyName>AnimeWidget</AssemblyName>
-    <Version>3.16.3</Version>
+    <Version>3.16.4</Version>
     <Description>追番桌面卡片 — AGE 动漫周表（C# WPF 版）</Description>
-    <!-- PerMonitorV2 DPI 清单（必须是 Property，放 ItemGroup 会被静默忽略——v3.16.2 踩过） -->
-    <ApplicationManifest>src\app.manifest</ApplicationManifest>
+    <!-- 不要加 ApplicationManifest：自定义 manifest 嵌进单文件 exe 会导致启动即崩
+         （DllNotFoundException @ HwndSubclass，v3.16.3 实测）。DPI 感知走 App.xaml.cs 的运行时 API -->
 
     <!-- 单文件发布 -->
     <PublishSingleFile>true</PublishSingleFile>
