@@ -56,8 +56,8 @@ public partial class SettingsWindow : Window
                 BorderThickness = new Thickness(2),
                 BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
                 Tag = i,
-                ToolTipService.ToolTip = name,
             };
+            ToolTipService.SetToolTip(border, name);
             if (i == _settings.Accent) border.BorderBrush = new SolidColorBrush(Microsoft.UI.Colors.White);
             border.Tapped += Accent_Tapped;
             AccentPanel.Children.Add(border);
