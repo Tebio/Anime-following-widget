@@ -31,7 +31,10 @@ public partial class WidgetWindow : Window
     private readonly List<Button> _tabButtons = new();
     private int _selectedDay;
     private string _search = "";
-    private WeekSchedule? _view; // 当前展示用的周表（缓存或最新抓取）
+    private WeekSchedule? _view;
+    private SettingsWindow? _settingsWin;
+    private readonly IntPtr _hwnd;
+    private bool _visible = true;
 
     public WidgetWindow()
     {
@@ -40,8 +43,9 @@ public partial class WidgetWindow : Window
         BootLog.Log("XamlInit ok");
 
         _settings = AppSettings.Load();
+        _hwnd = WindowNative.GetWindowHandle(this);
 
-        // ---- 材质：Win10 用 DesktopAcrylic，Win11 优先 Mica；都不支持退回纯色 ----
+        // ---- 材质：Win10 Acrylic / Win11 Mica ----
         try
         {
             if (Environment.OSVersion.Version.Build >= 22000 && MicaController.IsSupported())
@@ -52,26 +56,23 @@ public partial class WidgetWindow : Window
         }
         catch (Exception ex) { BootLog.Log("Backdrop fail: " + ex.Message); }
 
-        // ---- 无边框 + 拖拽区 + 尺寸/初始位置（DisplayArea 原生多屏感知） ----
+        // ---- 全窗口拖拽：把根 Grid 设为拖拽区，交互控件（按钮/列表/输入框）天然豁免 ----
+        ExtendsContentIntoTitleBar = true;
+        SetTitleBar(RootGrid);
+        if (AppWindow.Presenter is OverlappedPresenter p)
+        {
+            p.IsResizable = false;
+            p.IsMaximizable = false;
+            p.IsMinimizable = false;
+        }
+        AppWindow.Resize(new SizeInt32(360, 540));
         try
         {
-            ExtendsContentIntoTitleBar = true;
-            SetTitleBar(DragArea);
-            BootLog.Log("TitleBar ok");
-            if (AppWindow.Presenter is OverlappedPresenter p)
-            {
-                p.IsResizable = false;
-                p.IsMaximizable = false;
-                p.IsMinimizable = false;
-            }
-            AppWindow.Resize(new SizeInt32(360, 540));
-            BootLog.Log("Resize ok");
             var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary);
             var wa = area.WorkArea;
             AppWindow.Move(new PointInt32(wa.X + wa.Width - 360 - 24, wa.Y + 80));
-            BootLog.Log("Move ok");
         }
-        catch (Exception ex) { BootLog.Log("WindowConfig fail: " + ex.Message); }
+        catch { }
 
         EntryList.ItemsSource = _rows;
         BootLog.Log("ctor done");
@@ -83,21 +84,38 @@ public partial class WidgetWindow : Window
             var b = new Button
             {
                 Content = ScheduleService.WeekdayNames[i],
-                Padding = new Thickness(9, 3, 9, 3),
-                FontSize = 11,
+                Padding = new Thickness(7, 2, 7, 2),
+                FontSize = 10.5,
                 Tag = i,
             };
             b.Click += Tab_Click;
             _tabButtons.Add(b);
             TabPanel.Children.Add(b);
         }
-        UpdateTabStyles();
 
         // ---- 数据 ----
         _sched.ScheduleUpdated += _ => DispatcherQueue.TryEnqueue(() => BindSchedule());
         _sched.StateChanged += () => DispatcherQueue.TryEnqueue(UpdateStatus);
-        BindSchedule(AppSettings.LoadCache()); // 先上缓存秒开，后台再刷
+        BindSchedule(AppSettings.LoadCache());
         _sched.Start(_settings.RefreshMinutes);
+
+        ApplySettings();
+        TrayIcon.ForceCreate();
+        Closed += (_, _) => _sched.Dispose();
+    }
+
+    // ---------- 设置应用 ----------
+
+    public void ApplySettings()
+    {
+        RootGrid.Opacity = Math.Clamp(_settings.WindowOpacity, 0.2, 1.0);
+        var (r, g, b) = _settings.AccentRgb;
+        var accent = new SolidColorBrush(Windows.UI.Color.FromArgb(255, r, g, b));
+        AccentDot.Fill = accent;
+        UpdateTabStyles();
+        ApplyClickThrough(_settings.ClickThrough);
+        ApplyLock(_settings.Locked);
+        _sched.SetInterval(_settings.RefreshMinutes);
     }
 
     // ---------- 数据绑定 ----------
@@ -135,7 +153,9 @@ public partial class WidgetWindow : Window
                 Star = _settings.Favorites.Contains(e.DetailId) ? "★" : "☆",
                 IsEnd = e.IsEnd,
                 IsNewVis = e.IsNew && !isPast ? Visibility.Visible : Visibility.Collapsed,
-                Url = e.DetailUrl(s.Base),
+                Url = _settings.ClickTarget == ClickTarget.Play ? e.PlayUrl(s.Base)
+                    : _settings.ClickTarget == ClickTarget.Search ? e.SearchUrl(s.Base)
+                    : e.DetailUrl(s.Base),
             });
         }
     }
@@ -150,11 +170,12 @@ public partial class WidgetWindow : Window
 
     private void UpdateTabStyles()
     {
+        var (r, g, b) = _settings.AccentRgb;
         for (int i = 0; i < _tabButtons.Count; i++)
         {
             bool sel = i == _selectedDay;
             _tabButtons[i].Background = sel
-                ? (Brush)Application.Current.Resources["AccentFillColorDefaultBrush"]
+                ? new SolidColorBrush(Windows.UI.Color.FromArgb(255, r, g, b))
                 : new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(0x1A, 0xFF, 0xFF, 0xFF));
             _tabButtons[i].Foreground = sel
                 ? new SolidColorBrush(Microsoft.UI.Colors.White)
@@ -184,9 +205,27 @@ public partial class WidgetWindow : Window
 
     private void Refresh_Click(object sender, RoutedEventArgs e) => _sched.RefreshNow();
 
-    private void Close_Click(object sender, RoutedEventArgs e)
+    private void Settings_Click(object sender, RoutedEventArgs e)
     {
-        _sched.Dispose();
+        if (_settingsWin != null) { _settingsWin.Activate(); return; }
+        _settingsWin = new SettingsWindow(_settings, this);
+        _settingsWin.Closed += (_, _) => _settingsWin = null;
+        _settingsWin.Activate();
+    }
+
+    private void Hide_Click(object sender, RoutedEventArgs e) => ToggleVisibility();
+
+    public void ToggleVisibility()
+    {
+        _visible = !_visible;
+        if (_visible) AppWindow.Show(); else AppWindow.Hide();
+    }
+
+    private void Tray_Toggle(object sender, RoutedEventArgs e) => ToggleVisibility();
+
+    private void Tray_Exit(object sender, RoutedEventArgs e)
+    {
+        TrayIcon.Dispose();
         Close();
     }
 
@@ -206,4 +245,26 @@ public partial class WidgetWindow : Window
         if (e.ClickedItem is RowModel row)
             await Windows.System.Launcher.LaunchUriAsync(new Uri(row.Url));
     }
+
+    // ---------- Win32：鼠标穿透 / 锁定位置 ----------
+
+    private void ApplyClickThrough(bool on) => SetExStyle(WS_EX_TRANSPARENT, on);
+
+    public void ApplyLock(bool locked) => SetTitleBar(locked ? null : RootGrid);
+
+    private void SetExStyle(uint flag, bool on)
+    {
+        uint style = (uint)GetWindowLongPtrW(_hwnd, GWL_EXSTYLE);
+        ulong ns = on ? (style | flag) : (style & ~flag);
+        _ = SetWindowLongPtrW(_hwnd, GWL_EXSTYLE, (IntPtr)ns);
+    }
+
+    private const int GWL_EXSTYLE = -20;
+    private const uint WS_EX_TRANSPARENT = 0x20;
+
+    [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
+    private static extern IntPtr GetWindowLongPtrW(IntPtr hWnd, int nIndex);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+    private static extern IntPtr SetWindowLongPtrW(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
 }
