@@ -76,7 +76,7 @@ public partial class WidgetWindow : Window
             var b = new Button
             {
                 Content = ScheduleService.WeekdayNames[i],
-                Padding = new Thickness(9, 3),
+                Padding = new Thickness(9, 3, 9, 3),
                 FontSize = 11,
                 Tag = i,
             };
@@ -187,7 +187,8 @@ public partial class WidgetWindow : Window
     {
         if (sender is Button { Tag: string id })
         {
-            if (!_settings.Favorites.Add(id)) _settings.Favorites.Remove(id);
+            if (_settings.Favorites.Contains(id)) _settings.Favorites.Remove(id);
+            else _settings.Favorites.Add(id);
             _settings.Save();
             RefreshRows();
         }
