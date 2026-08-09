@@ -46,6 +46,8 @@
                 </StackPanel>
                 <ToggleSwitch x:Name="ClickThroughSwitch" Header="鼠标穿透（点击穿过卡片）" Toggled="Toggle_Changed"/>
                 <ToggleSwitch x:Name="LockSwitch" Header="锁定位置" Toggled="Toggle_Changed"/>
+                <ToggleSwitch x:Name="HoverRevealSwitch" Header="悬停显示（平时隐身，鼠标靠近浮现）" Toggled="Toggle_Changed"/>
+                <ToggleSwitch x:Name="EdgeHideSwitch" Header="贴边隐藏（靠边自动缩成细条）" Toggled="Toggle_Changed"/>
                 <ToggleSwitch x:Name="NotifySwitch" Header="收藏番开播提醒" Toggled="Toggle_Changed"/>
                 <ToggleSwitch x:Name="FavOnlySwitch" Header="只显示收藏的番" Toggled="Toggle_Changed"/>
             </StackPanel>

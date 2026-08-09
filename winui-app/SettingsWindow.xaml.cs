@@ -95,6 +95,8 @@ public partial class SettingsWindow : Window
 
         ClickThroughSwitch.IsOn = _settings.ClickThrough;
         LockSwitch.IsOn = _settings.Locked;
+        HoverRevealSwitch.IsOn = _settings.HoverReveal;
+        EdgeHideSwitch.IsOn = _settings.EdgeHide;
         NotifySwitch.IsOn = _settings.NotifyOnAir;
         FavOnlySwitch.IsOn = _settings.FavoritesOnly;
         _ready = true;
@@ -196,6 +198,8 @@ public partial class SettingsWindow : Window
         if (!_ready) return;
         _settings.ClickThrough = ClickThroughSwitch.IsOn;
         _settings.Locked = LockSwitch.IsOn;
+        _settings.HoverReveal = HoverRevealSwitch.IsOn;
+        _settings.EdgeHide = EdgeHideSwitch.IsOn;
         _settings.NotifyOnAir = NotifySwitch.IsOn;
         _settings.FavoritesOnly = FavOnlySwitch.IsOn;
         Save();

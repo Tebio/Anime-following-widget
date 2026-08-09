@@ -63,8 +63,25 @@ public partial class WidgetWindow : Window
         // 边框样式：保留 WS_THICKFRAME（系统边缘缩放需要它），清 DLGFRAME/BORDER（白边根因）
         uint st = (uint)GetWindowLongPtrW(_hwnd, GWL_STYLE);
         _ = SetWindowLongPtrW(_hwnd, GWL_STYLE, (IntPtr)(ulong)((st | WS_THICKFRAME) & ~(WS_DLGFRAME | WS_BORDER)));
-        RootGrid.PointerPressed += Root_PointerPressed;
         AppWindow.Resize(new SizeInt32(360, 540));
+
+        // ---- 原生级拖拽+八向缩放：NonClientPointerSource 区域（无标题栏窗口的正解） ----
+        _ncpSource = Microsoft.UI.Input.InputNonClientPointerSource.GetForWindowId(AppWindow.Id);
+        RootGrid.SizeChanged += (_, _) => { UpdateInputRegions(); ApplyRoundedRegion(); };
+        TabPanel.Loaded += (_, _) => UpdateInputRegions();
+
+        // ---- 贴边磁吸：拖动松手后吸附屏幕边 ----
+        _snapTimer = DispatcherQueue.CreateTimer();
+        _snapTimer.Interval = TimeSpan.FromMilliseconds(350);
+        _snapTimer.IsRepeating = false;
+        _snapTimer.Tick += (_, _) => SnapToEdges();
+        AppWindow.Changed += (_, a) => { if (a.DidPositionChange && !_snapping) { _snapTimer.Stop(); _snapTimer.Start(); } };
+
+        // ---- 悬停显示/贴边隐藏：光标轮询（不依赖窗口消息，被遮挡也能探到） ----
+        _pollTimer = DispatcherQueue.CreateTimer();
+        _pollTimer.Interval = TimeSpan.FromMilliseconds(150);
+        _pollTimer.Tick += (_, _) => PollCursor();
+        _pollTimer.Start();
         try
         {
             var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary);
@@ -135,6 +152,7 @@ public partial class WidgetWindow : Window
         AccentDot.Fill = accent;
         UpdateTabStyles();
         ApplyClickThrough(_settings.ClickThrough);
+        UpdateInputRegions(); // 锁定位置切换时同步拖拽区
         _sched.SetInterval(_settings.RefreshMinutes);
     }
 
@@ -266,73 +284,175 @@ public partial class WidgetWindow : Window
             await Windows.System.Launcher.LaunchUriAsync(new Uri(row.Url));
     }
 
-    // ---------- Win32：鼠标穿透 / 自绘拖拽与边缘缩放 ----------
+    // ---------- Win32：鼠标穿透 ----------
 
     private void ApplyClickThrough(bool on) => SetExStyle(WS_EX_TRANSPARENT, on);
 
-    // 自绘拖拽+缩放：PointerPressed 记录起点，移动超阈值才启动（点击不受影响）。
-    // 距边 8px 内=缩放（左/上边同步移动窗口），其余=移动。锁定时全部禁用。
-    private const double EdgeThreshold = 8;
-    private const double DragThreshold = 4;
-    private bool _opActive;
-    private bool _opLeft, _opRight, _opTop, _opBottom;
-    private Windows.Foundation.Point _opStart;
+    // ---------- 原生拖拽/缩放区域（InputNonClientPointerSource） ----------
 
-    private void Root_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    private Microsoft.UI.Input.InputNonClientPointerSource? _ncpSource;
+
+    private void UpdateInputRegions()
     {
-        if (_settings.Locked) return;
-        var pt = e.GetCurrentPoint(RootGrid);
-        if (!pt.Properties.IsLeftButtonPressed) return;
-        _opActive = true;
-        _opStart = pt.Position;
-        var w = RootGrid.ActualWidth; var h = RootGrid.ActualHeight;
-        _opLeft = pt.Position.X < EdgeThreshold;
-        _opRight = pt.Position.X > w - EdgeThreshold;
-        _opTop = pt.Position.Y < EdgeThreshold;
-        _opBottom = pt.Position.Y > h - EdgeThreshold;
-        RootGrid.CapturePointer(e.Pointer);
-        RootGrid.PointerMoved += Root_PointerMoved;
-        RootGrid.PointerReleased += Root_PointerReleased;
-        RootGrid.PointerCaptureLost += Root_PointerReleased;
-    }
-
-    private void Root_PointerMoved(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
-    {
-        if (!_opActive) return;
-        var pt = e.GetCurrentPoint(RootGrid);
-        double dx = pt.Position.X - _opStart.X, dy = pt.Position.Y - _opStart.Y;
-        if (Math.Abs(dx) < DragThreshold && Math.Abs(dy) < DragThreshold) return;
-
-        // 过了阈值：交还系统拖拽循环（自绘 Move/Resize 必闪，系统循环平滑且带吸附）
-        _opActive = false;
-        RootGrid.PointerMoved -= Root_PointerMoved;
-        RootGrid.PointerReleased -= Root_PointerReleased;
-        RootGrid.PointerCaptureLost -= Root_PointerReleased;
-        RootGrid.ReleasePointerCaptures();
-
-        int ht = (_opLeft, _opRight, _opTop, _opBottom) switch
+        if (_ncpSource == null) return;
+        try
         {
-            (true, false, true, false) => HTTOPLEFT,
-            (true, false, false, true) => HTBOTTOMLEFT,
-            (false, true, true, false) => HTTOPRIGHT,
-            (false, true, false, true) => HTBOTTOMRIGHT,
-            (true, false, _, _) => HTLEFT,
-            (false, true, _, _) => HTRIGHT,
-            (false, false, true, false) => HTTOP,
-            (false, false, false, true) => HTBOTTOM,
-            _ => HTCAPTION,
-        };
-        ReleaseCapture();
-        _ = SendMessageW(_hwnd, WM_NCLBUTTONDOWN, (IntPtr)ht, IntPtr.Zero);
+            double scale = RootGrid.XamlRoot?.RasterizationScale ?? 1.0;
+            int w = (int)(RootGrid.ActualWidth * scale), h = (int)(RootGrid.ActualHeight * scale);
+            if (w <= 0 || h <= 0) return;
+
+            // 全窗口为 Caption 拖拽区；交互控件设 Passthrough 保证可点
+            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.Caption,
+                _settings.Locked ? Array.Empty<RectInt32>() : new[] { new RectInt32(0, 0, w, h) });
+
+            var pass = new List<RectInt32>();
+            foreach (var el in new FrameworkElement[] { HeaderButtons, TabPanel, SearchBox, EntryList })
+            {
+                var p = el.TransformToVisual(null).TransformPoint(new Windows.Foundation.Point(0, 0));
+                pass.Add(new RectInt32(
+                    (int)(p.X * scale), (int)(p.Y * scale),
+                    (int)(el.ActualSize.X * scale), (int)(el.ActualSize.Y * scale)));
+            }
+            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.Passthrough, pass.ToArray());
+
+            // 八向缩放边/角（6px 边，14px 角）
+            const int edge = 6, corner = 14;
+            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.LeftBorder, new[] { new RectInt32(0, corner, edge, h - corner * 2) });
+            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.RightBorder, new[] { new RectInt32(w - edge, corner, edge, h - corner * 2) });
+            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.TopBorder, new[] { new RectInt32(corner, 0, w - corner * 2, edge) });
+            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.BottomBorder, new[] { new RectInt32(corner, h - edge, w - corner * 2, edge) });
+            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.TopLeftBorder, new[] { new RectInt32(0, 0, corner, corner) });
+            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.TopRightBorder, new[] { new RectInt32(w - corner, 0, corner, corner) });
+            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.BottomLeftBorder, new[] { new RectInt32(0, h - corner, corner, corner) });
+            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.BottomRightBorder, new[] { new RectInt32(w - corner, h - corner, corner, corner) });
+        }
+        catch { }
     }
 
-    private void Root_PointerReleased(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    // ---------- 圆角（Win10 无 DWM 圆角 API，用窗口 Region） ----------
+
+    private void ApplyRoundedRegion()
     {
-        _opActive = false;
-        RootGrid.PointerMoved -= Root_PointerMoved;
-        RootGrid.PointerReleased -= Root_PointerReleased;
-        RootGrid.PointerCaptureLost -= Root_PointerReleased;
+        try
+        {
+            int cornerPref = 2; // DWMWCP_ROUND —— Win11 原生圆角
+            DwmSetWindowAttribute(_hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref cornerPref, 4);
+            // Win10 回落：SetWindowRgn 圆角裁剪
+            if (Environment.OSVersion.Version.Build < 22000)
+            {
+                double scale = RootGrid.XamlRoot?.RasterizationScale ?? 1.0;
+                int w = (int)(RootGrid.ActualWidth * scale), h = (int)(RootGrid.ActualHeight * scale);
+                int r = (int)(10 * scale);
+                if (w > 0 && h > 0)
+                {
+                    IntPtr rgn = CreateRoundRectRgn(0, 0, w + 1, h + 1, r, r);
+                    SetWindowRgn(_hwnd, rgn, true);
+                }
+            }
+        }
+        catch { }
     }
+
+    // ---------- 贴边磁吸 ----------
+
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _snapTimer;
+    private bool _snapping;
+
+    private void SnapToEdges()
+    {
+        if (_edgeHidden) return;
+        try
+        {
+            var wa = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
+            var pos = AppWindow.Position; var size = AppWindow.Size;
+            const int snap = 16;
+            int nx = pos.X, ny = pos.Y;
+            if (Math.Abs(pos.X - wa.X) < snap) nx = wa.X;
+            else if (Math.Abs(pos.X + size.Width - (wa.X + wa.Width)) < snap) nx = wa.X + wa.Width - size.Width;
+            if (Math.Abs(pos.Y - wa.Y) < snap) ny = wa.Y;
+            else if (Math.Abs(pos.Y + size.Height - (wa.Y + wa.Height)) < snap) ny = wa.Y + wa.Height - size.Height;
+            if (nx != pos.X || ny != pos.Y)
+            {
+                _snapping = true;
+                AppWindow.Move(new PointInt32(nx, ny));
+                _snapping = false;
+            }
+        }
+        catch { }
+    }
+
+    // ---------- 悬停显示 / 贴边隐藏（光标轮询） ----------
+
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _pollTimer;
+    private bool _hoverHidden;
+    private bool _edgeHidden;
+    private PointInt32 _preHidePos;
+    private bool _preHideValid;
+
+    private void PollCursor()
+    {
+        try
+        {
+            GetCursorPos(out var cur);
+            var pos = AppWindow.Position; var size = AppWindow.Size;
+            bool inside = cur.X >= pos.X && cur.X <= pos.X + size.Width
+                       && cur.Y >= pos.Y && cur.Y <= pos.Y + size.Height;
+
+            // 悬停显示：平时全透，光标进入区域浮现（轮询实现，窗口被遮挡也能探到）
+            if (_settings.HoverReveal)
+            {
+                byte target = inside ? CurrentNormalAlpha() : (byte)0;
+                if (inside == _hoverHidden) // 状态需要翻转
+                {
+                    SetExStyle(WS_EX_LAYERED, true);
+                    SetLayeredWindowAttributes(_hwnd, 0, target, LWA_ALPHA);
+                    _hoverHidden = !inside;
+                }
+            }
+            else if (_hoverHidden)
+            {
+                SetLayeredWindowAttributes(_hwnd, 0, CurrentNormalAlpha(), LWA_ALPHA);
+                _hoverHidden = false;
+            }
+
+            // 贴边隐藏：贴着屏幕边且光标远离 → 缩成 6px 细条；光标靠近 → 滑回
+            if (_settings.EdgeHide && !_settings.Locked)
+            {
+                var wa = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
+                bool atRight = pos.X + size.Width >= wa.X + wa.Width - 2;
+                bool atLeft = pos.X <= wa.X + 2;
+                bool atTop = pos.Y <= wa.Y + 2;
+                bool near = cur.X >= pos.X - 24 && cur.X <= pos.X + size.Width + 24
+                         && cur.Y >= pos.Y - 24 && cur.Y <= pos.Y + size.Height + 24;
+
+                if (!_edgeHidden && (atRight || atLeft || atTop) && !near)
+                {
+                    _edgeHidden = true;
+                    _preHidePos = pos; _preHideValid = true;
+                    const int strip = 6;
+                    if (atRight) AppWindow.Move(new PointInt32(wa.X + wa.Width - strip, pos.Y));
+                    else if (atLeft) AppWindow.Move(new PointInt32(wa.X + strip - size.Width, pos.Y));
+                    else AppWindow.Move(new PointInt32(pos.X, wa.Y + strip - size.Height));
+                }
+                else if (_edgeHidden && near)
+                {
+                    _edgeHidden = false;
+                    if (_preHideValid) AppWindow.Move(_preHidePos);
+                }
+            }
+            else if (_edgeHidden)
+            {
+                _edgeHidden = false;
+                if (_preHideValid) AppWindow.Move(_preHidePos);
+            }
+        }
+        catch { }
+    }
+
+    private byte CurrentNormalAlpha() =>
+        _settings.BlurMode == 0
+            ? (byte)Math.Clamp(_settings.WindowOpacity * 255, 60, 255)
+            : (byte)255;
 
     private void SetExStyle(uint flag, bool on)
     {
@@ -372,4 +492,21 @@ public partial class WidgetWindow : Window
 
     [DllImport("user32.dll")]
     private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetCursorPos(out POINT lpPoint);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct POINT { public int X; public int Y; }
+
+    [DllImport("gdi32.dll")]
+    private static extern IntPtr CreateRoundRectRgn(int l, int t, int r, int b, int w, int h);
+
+    [DllImport("user32.dll")]
+    private static extern int SetWindowRgn(IntPtr hWnd, IntPtr hRgn, bool redraw);
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
+
+    private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
 }
