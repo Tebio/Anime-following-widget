@@ -11,8 +11,8 @@
     <Description>追番桌面卡片 v4 — WinUI 3 重写（亚克力材质 + ClearType 文字）</Description>
     <UseWinUI>true</UseWinUI>
     <WindowsPackageType>None</WindowsPackageType>
-    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-    <SelfContained>true</SelfContained>
+    <WindowsAppSDKSelfContained>false</WindowsAppSDKSelfContained>
+    <SelfContained>false</SelfContained>
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <PublishSingleFile>false</PublishSingleFile> <!-- WinUI3 无法单文件 -->
     <Nullable>enable</Nullable>
@@ -21,7 +21,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.2.0" />
+    <!-- WASDK 1.8（Win10 久经考验线）+ 系统装 Windows App Runtime（DeskBox 同款分发）。
+         版本对齐用户机器已装的 1.8 运行时 8000.921.x，别超过它 -->
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260529003" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2270" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="HtmlAgilityPack" Version="1.11.74" />

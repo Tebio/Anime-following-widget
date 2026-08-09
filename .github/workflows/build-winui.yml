@@ -26,32 +26,24 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
-      - name: Publish self-contained
-        run: dotnet publish AnimeWidget.WinUI.csproj -c Release -r win-x64 -p:Platform=x64 --self-contained true -o artifacts/winui
-
-      - name: Publish framework-dependent（绕开"自包含加载卡死"的机器级问题）
+      - name: Publish framework-dependent（系统装 .NET 8 运行时 + Windows App Runtime 1.8）
         run: dotnet publish AnimeWidget.WinUI.csproj -c Release -r win-x64 -p:Platform=x64 --self-contained false -o artifacts/winui-fd
 
-      - name: Package folders as zip
+      - name: Package folder as zip
         run: |
-          Compress-Archive -Path artifacts/winui/* -DestinationPath artifacts/AnimeWidget-winui-x64.zip -Force
-          Compress-Archive -Path artifacts/winui-fd/* -DestinationPath artifacts/AnimeWidget-winui-x64-needs-dotnet8.zip -Force
+          Compress-Archive -Path artifacts/winui-fd/* -DestinationPath artifacts/AnimeWidget-winui-x64.zip -Force
         shell: pwsh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: AnimeWidget-winui-x64
-          path: |
-            winui-app/artifacts/AnimeWidget-winui-x64.zip
-            winui-app/artifacts/AnimeWidget-winui-x64-needs-dotnet8.zip
+          path: winui-app/artifacts/AnimeWidget-winui-x64.zip
           retention-days: 3
 
       - name: Publish to Release (on tag)
         if: startsWith(github.ref, 'refs/tags/v4.')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            winui-app/artifacts/AnimeWidget-winui-x64.zip
-            winui-app/artifacts/AnimeWidget-winui-x64-needs-dotnet8.zip
+          files: winui-app/artifacts/AnimeWidget-winui-x64.zip
           generate_release_notes: true
