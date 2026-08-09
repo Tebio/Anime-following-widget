@@ -10,7 +10,7 @@
     <Window.Resources>
         <SolidColorBrush x:Key="SubBrush" Color="#B9BEC9"/>
         <SolidColorBrush x:Key="DimBrush" Color="#8B91A0"/>
-        <SolidColorBrush x:Key="CardBrush" Color="#0AFFFFFF"/>
+        <SolidColorBrush x:Key="CardBrush" Color="#14FFFFFF"/>
         <SolidColorBrush x:Key="AccentBrush" Color="#2BA8A0"/>
 
         <!-- iOS 风开关（CheckBox → 拨杆），优效同款交互 -->
@@ -51,6 +51,43 @@
                     <ControlTemplate TargetType="Thumb">
                         <Ellipse Width="14" Height="14" Fill="White"
                                  Stroke="{StaticResource AccentBrush}" StrokeThickness="2"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- 滑杆整体模板：深色圆角轨道 + 左段强调色填充，替换 WPF 默认的灰色凹陷滑杆槽 -->
+        <Style TargetType="Slider">
+            <Setter Property="Height" Value="20"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Slider">
+                        <Grid VerticalAlignment="Center">
+                            <Border Height="4" CornerRadius="2" Background="#1AFFFFFF"/>
+                            <Track x:Name="PART_Track">
+                                <Track.DecreaseRepeatButton>
+                                    <RepeatButton Command="Slider.DecreaseLarge">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate>
+                                                <Border Height="4" CornerRadius="2" Background="{StaticResource AccentBrush}"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.DecreaseRepeatButton>
+                                <Track.IncreaseRepeatButton>
+                                    <RepeatButton Command="Slider.IncreaseLarge">
+                                        <RepeatButton.Template>
+                                            <ControlTemplate>
+                                                <Border Height="4" CornerRadius="2" Background="Transparent"/>
+                                            </ControlTemplate>
+                                        </RepeatButton.Template>
+                                    </RepeatButton>
+                                </Track.IncreaseRepeatButton>
+                                <Track.Thumb>
+                                    <Thumb Style="{StaticResource RoundThumb}"/>
+                                </Track.Thumb>
+                            </Track>
+                        </Grid>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -149,7 +186,12 @@
                         VerticalAlignment="Center" Margin="0,0,6,0"/>
                 <TextBlock Text="外观" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DimBrush}"/>
             </StackPanel>
-            <Border Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12" Margin="0,6,0,12">
+            <Border Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12" Margin="0,6,0,12"
+                    BorderBrush="#12FFFFFF" BorderThickness="1">
+                <Border.Effect>
+                    <!-- 轻投影：只让卡片微微浮起，BlurRadius 大了会在深色底上糊出一圈光晕 -->
+                    <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.22" Color="Black"/>
+                </Border.Effect>
                 <StackPanel>
                     <Grid>
                         <TextBlock Text="窗口透明度" FontSize="12" VerticalAlignment="Center"/>
@@ -193,7 +235,12 @@
                         VerticalAlignment="Center" Margin="0,0,6,0"/>
                 <TextBlock Text="行为" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DimBrush}"/>
             </StackPanel>
-            <Border Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12" Margin="0,6,0,12">
+            <Border Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12" Margin="0,6,0,12"
+                    BorderBrush="#12FFFFFF" BorderThickness="1">
+                <Border.Effect>
+                    <!-- 轻投影：只让卡片微微浮起，BlurRadius 大了会在深色底上糊出一圈光晕 -->
+                    <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.22" Color="Black"/>
+                </Border.Effect>
                 <StackPanel>
                     <TextBlock Text="点击番名打开" FontSize="12" Margin="0,0,0,6"/>
                     <StackPanel x:Name="ClickPills" Orientation="Horizontal" Margin="0,0,0,2"/>
@@ -269,7 +316,11 @@
                         VerticalAlignment="Center" Margin="0,0,6,0"/>
                 <TextBlock Text="数据" FontSize="11" FontWeight="SemiBold" Foreground="{StaticResource DimBrush}"/>
             </StackPanel>
-            <Border Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12" Margin="0,6,0,10">
+            <Border Background="{StaticResource CardBrush}" CornerRadius="12" Padding="14,12" Margin="0,6,0,10"
+                    BorderBrush="#12FFFFFF" BorderThickness="1">
+                <Border.Effect>
+                    <DropShadowEffect BlurRadius="10" ShadowDepth="2" Opacity="0.22" Color="Black"/>
+                </Border.Effect>
                 <StackPanel>
                     <TextBlock x:Name="ProxyText" FontSize="11" Foreground="{StaticResource SubBrush}"/>
                     <TextBlock x:Name="SourceTextDiag" FontSize="11" Foreground="{StaticResource SubBrush}"

@@ -270,6 +270,30 @@ internal static class Win32
     public static void EnableAcrylic(IntPtr hwnd) => SetAccent(hwnd, 4, 2, unchecked((int)0x381E1410)); // 22% 轻 tint
     public static void DisableAcrylic(IntPtr hwnd) => SetAccent(hwnd, 0, 0, 0); // ACCENT_DISABLED
 
+    // ---- Win11 原生窗口外观（DWM 级，不碰 AllowsTransparency，不影响 ClearType） ----
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
+
+    private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33; // Win11 22000+
+    private const int DWMWCP_ROUND = 2;
+    private const int DWMWA_SYSTEMBACKDROP_TYPE = 38;      // Win11 22621+
+    private const int DWMSBT_TRANSIENTWINDOW = 3;          // Acrylic 质感（弹层/对话框推荐；不是 MAINWINDOW=2 的 Mica）
+
+    /// <summary>Win11 22621+：普通不透明窗口套系统圆角 + Acrylic 背景板。
+    /// 返回值=两个 DWM 调用是否都生效；Win10/旧版 DWM 返回 false，调用方负责兜底（纯色背景）。</summary>
+    public static bool ApplyModernChrome(IntPtr hwnd)
+    {
+        try
+        {
+            int corner = DWMWCP_ROUND;
+            if (DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref corner, sizeof(int)) < 0) return false;
+            int backdrop = DWMSBT_TRANSIENTWINDOW;
+            if (DwmSetWindowAttribute(hwnd, DWMWA_SYSTEMBACKDROP_TYPE, ref backdrop, sizeof(int)) < 0) return false;
+            return true;
+        }
+        catch { return false; }
+    }
+
     /// <summary>界面效果三态（同优效：无/毛玻璃/亚克力），tint 由调用方按滑条算好。</summary>
     public static void SetBlur(IntPtr hwnd, int mode, byte alpha, byte red, byte green, byte blue)
     {

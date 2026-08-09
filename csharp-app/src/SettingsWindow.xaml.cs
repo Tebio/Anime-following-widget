@@ -1,6 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 
 namespace AnimeWidget;
@@ -29,6 +30,17 @@ public partial class SettingsWindow : Window
         InitializeComponent();
         _settings = settings;
         _sched = sched;
+
+        // Win11 22621+：DWM 原生圆角 + Acrylic 系统背景板（不碰 AllowsTransparency，保住 ClearType）。
+        // Win10/旧 DWM 调用失败 → 不动 Background，保持 XAML 里的 #FF161A22 纯色兜底，绝不出现透明破图。
+        SourceInitialized += (_, _) =>
+        {
+            if (Environment.OSVersion.Version.Build >= 22621 &&
+                Win32.ApplyModernChrome(new WindowInteropHelper(this).Handle))
+            {
+                Background = Brushes.Transparent; // 系统背景板顶到最底层，纯色背景让位
+            }
+        };
 
         // 用当前主题色初始化唯一画刷实例，并覆盖 XAML 默认资源（同一对象，后续改 .Color 即全局联动）
         var (_, ar, ag, ab) = AppSettings.Accents[Math.Clamp(settings.Accent, 0, AppSettings.Accents.Length - 1)];
@@ -170,8 +182,8 @@ public partial class SettingsWindow : Window
 
     // ---------- 嵌入选项卡 ----------
 
-    private static readonly Brush CardRestBrush = new SolidColorBrush(Color.FromArgb(0x0A, 0xFF, 0xFF, 0xFF));
-    private static readonly Brush CardHoverBrush = new SolidColorBrush(Color.FromArgb(0x16, 0xFF, 0xFF, 0xFF));
+    private static readonly Brush CardRestBrush = new SolidColorBrush(Color.FromArgb(0x14, 0xFF, 0xFF, 0xFF));
+    private static readonly Brush CardHoverBrush = new SolidColorBrush(Color.FromArgb(0x22, 0xFF, 0xFF, 0xFF));
 
     private void EmbedCard_Hover(object sender, MouseEventArgs e)
     {
