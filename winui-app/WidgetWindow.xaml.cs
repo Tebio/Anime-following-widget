@@ -315,16 +315,12 @@ public partial class WidgetWindow : Window
             }
             _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.Passthrough, pass.ToArray());
 
-            // 八向缩放边/角（6px 边，14px 角）
-            const int edge = 6, corner = 14;
-            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.LeftBorder, new[] { new RectInt32(0, corner, edge, h - corner * 2) });
-            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.RightBorder, new[] { new RectInt32(w - edge, corner, edge, h - corner * 2) });
-            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.TopBorder, new[] { new RectInt32(corner, 0, w - corner * 2, edge) });
-            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.BottomBorder, new[] { new RectInt32(corner, h - edge, w - corner * 2, edge) });
-            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.TopLeftBorder, new[] { new RectInt32(0, 0, corner, corner) });
-            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.TopRightBorder, new[] { new RectInt32(w - corner, 0, corner, corner) });
-            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.BottomLeftBorder, new[] { new RectInt32(0, h - corner, corner, corner) });
-            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.BottomRightBorder, new[] { new RectInt32(w - corner, h - corner, corner, corner) });
+            // 四边缩放区（8px；角落由相邻边交汇自动生效，SDK 无单独角落枚举）
+            const int edge = 8;
+            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.LeftBorder, new[] { new RectInt32(0, 0, edge, h) });
+            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.RightBorder, new[] { new RectInt32(w - edge, 0, edge, h) });
+            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.TopBorder, new[] { new RectInt32(0, 0, w, edge) });
+            _ncpSource.SetRegionRects(Microsoft.UI.Input.NonClientRegionKind.BottomBorder, new[] { new RectInt32(0, h - edge, w, edge) });
         }
         catch { }
     }
