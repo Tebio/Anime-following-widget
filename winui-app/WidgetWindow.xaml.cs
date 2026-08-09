@@ -100,6 +100,7 @@ public partial class WidgetWindow : Window
         _sched.Start(_settings.RefreshMinutes);
 
         ApplySettings();
+        TrayIcon.LeftClickCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(ToggleVisibility);
         TrayIcon.ForceCreate();
         Closed += (_, _) => _sched.Dispose();
     }

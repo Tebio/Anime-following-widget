@@ -16,8 +16,7 @@
 
         <!-- 系统托盘 -->
         <tb:TaskbarIcon x:Name="TrayIcon" ToolTipText="追番周表" x:FieldModifier="public"
-                        IconSource="ms-appx:///Assets/app.ico"
-                        LeftClickCommand="{x:Bind ToggleVisibility}">
+                        IconSource="ms-appx:///Assets/app.ico">
             <tb:TaskbarIcon.ContextFlyout>
                 <MenuFlyout>
                     <MenuFlyoutItem Text="显示 / 隐藏" Click="Tray_Toggle"/>
