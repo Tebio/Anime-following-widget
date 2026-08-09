@@ -54,6 +54,10 @@ public class AppViewModel : ObservableBase
     public HashSet<string> Favorites { get; set; } = new();
     public bool FavoritesOnly { get; set; }
 
+    /// <summary>标题关键字过滤（不持久化，重启清空；与 FavoritesOnly 是"且"关系）。</summary>
+    private string _searchText = "";
+    public string SearchText { get => _searchText; set { if (Set(ref _searchText, value)) RefreshEntries(); } }
+
     private int _selectedDay = ScheduleService.TodayIndex();
     public int SelectedDay { get => _selectedDay; set { if (Set(ref _selectedDay, value)) RefreshEntries(); } }
 
@@ -114,6 +118,7 @@ public class AppViewModel : ObservableBase
         foreach (var e in day.Entries)
         {
             if (FavoritesOnly && !Favorites.Contains(e.DetailId)) continue;
+            if (SearchText.Length > 0 && !e.Title.Contains(SearchText, StringComparison.OrdinalIgnoreCase)) continue;
             var isPast = isToday
                 && TimeSpan.TryParseExact(e.Time, "hh\\:mm", null, out var t)
                 && t < now;

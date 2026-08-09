@@ -4,11 +4,12 @@
     <OutputType>WinExe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms> <!-- 多屏支持：Screen.FromPoint 取当前屏工作区 -->
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AnimeWidget</RootNamespace>
     <AssemblyName>AnimeWidget</AssemblyName>
-    <Version>3.15.1</Version>
+    <Version>3.16.0</Version>
     <Description>追番桌面卡片 — AGE 动漫周表（C# WPF 版）</Description>
 
     <!-- 单文件发布 -->
@@ -28,6 +29,9 @@
   <!-- App.xaml 在 src/ 下，显式声明为应用入口 -->
   <ItemGroup>
     <ApplicationDefinition Include="src\App.xaml" />
+    <!-- UseWindowsForms 的隐式 using 与 WPF 类型冲突，移除（代码里全限定名/SD. 别名） -->
+    <Using Remove="System.Drawing" />
+    <Using Remove="System.Windows.Forms" />
   </ItemGroup>
 
 </Project>

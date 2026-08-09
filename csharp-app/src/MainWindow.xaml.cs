@@ -221,10 +221,32 @@ public partial class MainWindow : Window
         var visible = Rect.Intersect(vs, win);
         if (visible.IsEmpty || visible.Width * visible.Height < win.Width * win.Height / 4)
         {
-            var wa = SystemParameters.WorkArea;
+            var wa = CurrentWorkArea();
             Left = wa.Right - Width - 24;
             Top = wa.Top + 80;
         }
+    }
+
+    /// <summary>当前窗口所在屏幕的工作区（WPF 逻辑像素）。
+    /// 多屏修复：SystemParameters.WorkArea 只有主屏——挂件拖到副屏时磁吸/回弹/贴边隐藏全按主屏误判。
+    /// 物理↔逻辑像素经 CompositionTarget 变换矩阵换算（DPI 缩放不踩坑）。</summary>
+    private Rect CurrentWorkArea()
+    {
+        try
+        {
+            if (PresentationSource.FromVisual(this)?.CompositionTarget is { } ct)
+            {
+                var centerDev = ct.TransformToDevice.Transform(
+                    new System.Windows.Point(Left + Width / 2, Top + Height / 2));
+                var scr = System.Windows.Forms.Screen.FromPoint(new SD.Point((int)centerDev.X, (int)centerDev.Y));
+                var wa = scr.WorkingArea;
+                var tl = ct.TransformFromDevice.Transform(new System.Windows.Point(wa.Left, wa.Top));
+                var br = ct.TransformFromDevice.Transform(new System.Windows.Point(wa.Right, wa.Bottom));
+                return new Rect(tl, br);
+            }
+        }
+        catch { }
+        return SystemParameters.WorkArea; // 未上屏/异常 → 主屏兜底（构造期默认位本来就该用主屏）
     }
 
     private void ApplyAccent()
@@ -770,7 +792,7 @@ public partial class MainWindow : Window
 
     private void SnapToEdges()
     {
-        var wa = SystemParameters.WorkArea;
+        var wa = CurrentWorkArea(); // 多屏：用当前所在屏，不是主屏
         // ① 靠近边缘 20px → 吸附
         if (Math.Abs(Left - wa.Left) < SnapDist) Left = wa.Left + EdgeMargin;
         else if (Math.Abs(wa.Right - (Left + Width)) < SnapDist) Left = wa.Right - Width - EdgeMargin;
@@ -909,7 +931,7 @@ public partial class MainWindow : Window
             if (over) { _hideCountdown = 5; return; }
             if (--_hideCountdown > 0) return;
             _hideCountdown = 0;
-            var wa = SystemParameters.WorkArea;
+            var wa = CurrentWorkArea();
             _dockX = Left; _dockY = Top;
             if (_dockEdge == 1) Left = wa.Left - Width + 6;
             else if (_dockEdge == 2) Left = wa.Right - 6;
@@ -919,7 +941,7 @@ public partial class MainWindow : Window
         else
         {
             // 光标探到露出的细条附近 → 滑回
-            var wa = SystemParameters.WorkArea;
+            var wa = CurrentWorkArea();
             bool near = _dockEdge switch
             {
                 1 => cx <= wa.Left + 16 && cy >= _dockY - 8 && cy <= _dockY + Height + 8,
@@ -963,6 +985,13 @@ public partial class MainWindow : Window
     }
 
     private void Refresh_Click(object sender, RoutedEventArgs e) => _sched.RefreshNow();
+
+    /// <summary>搜索框：实时收窄当前 tab 列表，清空恢复（不持久化）。</summary>
+    private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        _vm.SearchText = SearchBox.Text.Trim();
+        SearchHint.Visibility = SearchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+    }
 
     private void ErrorBanner_Click(object sender, MouseButtonEventArgs e) => _sched.RefreshNow();
 
