@@ -263,6 +263,7 @@ public partial class WidgetWindow : Window
 
     public void ToggleVisibility()
     {
+        _hoverHidden = false; // 托盘/按钮显隐优先于悬停状态机，避免互相打架
         _visible = !_visible;
         if (_visible) AppWindow.Show(); else AppWindow.Hide();
     }
@@ -439,22 +440,17 @@ public partial class WidgetWindow : Window
             bool inside = cur.X >= pos.X && cur.X <= pos.X + size.Width
                        && cur.Y >= pos.Y && cur.Y <= pos.Y + size.Height;
 
-            // 悬停显示：平时 Hide，光标进入区域且正下方是桌面才浮现。
+            // 悬停显示：平时 Hide，光标进入区域浮现（3.16.1 同款语义：被遮挡也浮现）。
             // 用 AppWindow.Hide/Show 不用分层 alpha（alpha+DComp 在 Win10 上有概率整个窗消失）。
-            // WindowFromPoint 门控：光标压在别的应用窗口上时不抢戏（对齐酷呆行为）。
             // 设置窗开着时强制可见（3.16.1 行为：一边调设置一边看效果，别在眼皮底下消失）。
             if (_settings.HoverReveal)
             {
                 bool settingsOpen = _settingsWin != null;
                 if ((inside || settingsOpen) && _hoverHidden)
                 {
-                    var root = GetAncestor(WindowFromPoint(cur), GA_ROOT);
-                    if (settingsOpen || root == _hwnd || IsShellWindow(root))
-                    {
-                        _hoverHidden = false;
-                        _visible = true;
-                        AppWindow.Show();
-                    }
+                    _hoverHidden = false;
+                    _visible = true;
+                    AppWindow.Show();
                 }
                 else if (!inside && !settingsOpen && !_hoverHidden)
                 {
