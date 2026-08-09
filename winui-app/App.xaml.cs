@@ -36,8 +36,8 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
         BootLog.Log("OnLaunched enter");
-        _window = new MinimalWindow(); // 二分定位：先验证框架，再验证 WidgetWindow
-        BootLog.Log("MinimalWindow created");
+        _window = new WidgetWindow();
+        BootLog.Log("WidgetWindow created");
         _window.Activate();
         BootLog.Log("Activate ok");
     }
