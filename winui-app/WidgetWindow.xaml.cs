@@ -35,7 +35,9 @@ public partial class WidgetWindow : Window
 
     public WidgetWindow()
     {
+        BootLog.Log("WidgetWindow.ctor enter");
         InitializeComponent();
+        BootLog.Log("XamlInit ok");
 
         _settings = AppSettings.Load();
 
@@ -46,28 +48,33 @@ public partial class WidgetWindow : Window
                 SystemBackdrop = new MicaBackdrop { Kind = MicaKind.BaseAlt };
             else if (DesktopAcrylicController.IsSupported())
                 SystemBackdrop = new DesktopAcrylicBackdrop();
+            BootLog.Log("Backdrop ok");
         }
-        catch { /* 无材质 → 纯色兜底 */ }
+        catch (Exception ex) { BootLog.Log("Backdrop fail: " + ex.Message); }
 
         // ---- 无边框 + 拖拽区 + 尺寸/初始位置（DisplayArea 原生多屏感知） ----
-        ExtendsContentIntoTitleBar = true;
-        SetTitleBar(DragArea);
-        if (AppWindow.Presenter is OverlappedPresenter p)
-        {
-            p.IsResizable = false;
-            p.IsMaximizable = false;
-            p.IsMinimizable = false;
-        }
-        AppWindow.Resize(new SizeInt32(360, 540));
         try
         {
+            ExtendsContentIntoTitleBar = true;
+            SetTitleBar(DragArea);
+            BootLog.Log("TitleBar ok");
+            if (AppWindow.Presenter is OverlappedPresenter p)
+            {
+                p.IsResizable = false;
+                p.IsMaximizable = false;
+                p.IsMinimizable = false;
+            }
+            AppWindow.Resize(new SizeInt32(360, 540));
+            BootLog.Log("Resize ok");
             var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary);
             var wa = area.WorkArea;
             AppWindow.Move(new PointInt32(wa.X + wa.Width - 360 - 24, wa.Y + 80));
+            BootLog.Log("Move ok");
         }
-        catch { }
+        catch (Exception ex) { BootLog.Log("WindowConfig fail: " + ex.Message); }
 
         EntryList.ItemsSource = _rows;
+        BootLog.Log("ctor done");
 
         // ---- 周几 tab ----
         _selectedDay = ScheduleService.TodayIndex();
