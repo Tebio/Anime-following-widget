@@ -807,6 +807,7 @@ public partial class MainWindow : Window
             if (cur == null || cur._hwnd == IntPtr.Zero || !cur.IsLoaded) return; // 未初始化/正常退出不管
             if (Win32.IsWindow(cur._hwnd)) return;
             Win32.LayerLog("僵尸检测：hwnd 已被销毁（WorkerW 父层连坐），自动重建窗口");
+            try { cur._sched.Dispose(); } catch { } // 旧实例抓取循环随之取消，避免泄漏
             var nw = new MainWindow();
             _current = nw;
             nw.Show();

@@ -39,7 +39,7 @@ public static class ProxyDetect
         {
             var v = Environment.GetEnvironmentVariable(name);
             if (!string.IsNullOrWhiteSpace(v))
-                return v.Trim();
+                return WithScheme(v.Trim(), socks: false);
         }
         return null;
     }

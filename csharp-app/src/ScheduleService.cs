@@ -45,9 +45,17 @@ public class ScheduleService : IDisposable
         var handler = new HttpClientHandler();
         if (proxy != null)
         {
-            handler.Proxy = new WebProxy(proxy);
-            handler.UseProxy = true;
-            _proxyDesc = proxy;
+            try
+            {
+                handler.Proxy = new WebProxy(proxy);
+                handler.UseProxy = true;
+                _proxyDesc = proxy;
+            }
+            catch (Exception ex)
+            {
+                handler.UseProxy = false;
+                _proxyDesc = $"直连（代理地址无效: {proxy}, {ex.Message}）";
+            }
         }
         else
         {
@@ -284,5 +292,6 @@ public class ScheduleService : IDisposable
     public void Dispose()
     {
         _cts?.Cancel();
+        _cts?.Dispose();
     }
 }
