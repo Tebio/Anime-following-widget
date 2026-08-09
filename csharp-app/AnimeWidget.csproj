@@ -9,8 +9,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AnimeWidget</RootNamespace>
     <AssemblyName>AnimeWidget</AssemblyName>
-    <Version>3.16.2</Version>
+    <Version>3.16.3</Version>
     <Description>追番桌面卡片 — AGE 动漫周表（C# WPF 版）</Description>
+    <!-- PerMonitorV2 DPI 清单（必须是 Property，放 ItemGroup 会被静默忽略——v3.16.2 踩过） -->
+    <ApplicationManifest>src\app.manifest</ApplicationManifest>
 
     <!-- 单文件发布 -->
     <PublishSingleFile>true</PublishSingleFile>
@@ -29,7 +31,6 @@
   <!-- App.xaml 在 src/ 下，显式声明为应用入口 -->
   <ItemGroup>
     <ApplicationDefinition Include="src\App.xaml" />
-    <ApplicationManifest Include="src\app.manifest" />
     <!-- UseWindowsForms 的隐式 using 与 WPF 类型冲突，移除（代码里全限定名/SD. 别名） -->
     <Using Remove="System.Drawing" />
     <Using Remove="System.Windows.Forms" />
