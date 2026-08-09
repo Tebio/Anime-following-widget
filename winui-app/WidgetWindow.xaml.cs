@@ -117,8 +117,16 @@ public partial class WidgetWindow : Window
 
         ApplySettings();
         TrayIcon.LeftClickCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(ToggleVisibility);
+        try
+        {
+            var ico = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico");
+            if (System.IO.File.Exists(ico)) TrayIcon.Icon = new System.Drawing.Icon(ico);
+        }
+        catch (Exception ex) { BootLog.Log("TrayIcon fail: " + ex.Message); }
         TrayIcon.ForceCreate();
         Closed += (_, _) => _sched.Dispose();
+        _current = this;
+        StartWatchdog();
     }
 
     // ---------- 设置应用 ----------
@@ -263,6 +271,7 @@ public partial class WidgetWindow : Window
 
     private void Tray_Exit(object sender, RoutedEventArgs e)
     {
+        _exiting = true;
         TrayIcon.Dispose();
         Close();
     }
@@ -282,6 +291,42 @@ public partial class WidgetWindow : Window
     {
         if (e.ClickedItem is RowModel row)
             await Windows.System.Launcher.LaunchUriAsync(new Uri(row.Url));
+    }
+
+    // ---------- 僵尸自愈看门狗（移植 v3.12.0/3.16.1） ----------
+    // 整理软件重建桌面层会连坐销毁 hwnd；"应显示却不可见"也会被拉回。
+    // "消失救不回只能重启" 从结构上消灭。
+
+    private static WidgetWindow? _current;
+    private static Microsoft.UI.Dispatching.DispatcherQueueTimer? _dog;
+    private bool _exiting;
+
+    private void StartWatchdog()
+    {
+        if (_dog != null) return;
+        _dog = DispatcherQueue.CreateTimer();
+        _dog.Interval = TimeSpan.FromSeconds(5);
+        _dog.Tick += (_, _) =>
+        {
+            var cur = _current;
+            if (cur == null || cur._exiting) return;
+            if (!IsWindow(cur._hwnd))
+            {
+                BootLog.Log("看门狗：hwnd 已死，重建窗口");
+                try { cur._sched.Dispose(); } catch { }
+                try { cur.TrayIcon.Dispose(); } catch { }
+                _current = new WidgetWindow();
+                _current.Activate();
+                return;
+            }
+            // 应显示却被搞没了（整理软件/收纳层冲突）→ 拉回
+            if (cur._visible && !cur._hoverHidden && !IsWindowVisible(cur._hwnd))
+            {
+                BootLog.Log("看门狗：窗口应显示但不可见，拉回");
+                try { cur.AppWindow.Show(); } catch { }
+            }
+        };
+        _dog.Start();
     }
 
     // ---------- Win32：鼠标穿透 ----------
@@ -397,19 +442,21 @@ public partial class WidgetWindow : Window
             // 悬停显示：平时 Hide，光标进入区域且正下方是桌面才浮现。
             // 用 AppWindow.Hide/Show 不用分层 alpha（alpha+DComp 在 Win10 上有概率整个窗消失）。
             // WindowFromPoint 门控：光标压在别的应用窗口上时不抢戏（对齐酷呆行为）。
+            // 设置窗开着时强制可见（3.16.1 行为：一边调设置一边看效果，别在眼皮底下消失）。
             if (_settings.HoverReveal)
             {
-                if (inside && _hoverHidden)
+                bool settingsOpen = _settingsWin != null;
+                if ((inside || settingsOpen) && _hoverHidden)
                 {
                     var root = GetAncestor(WindowFromPoint(cur), GA_ROOT);
-                    if (root == _hwnd || IsShellWindow(root))
+                    if (settingsOpen || root == _hwnd || IsShellWindow(root))
                     {
                         _hoverHidden = false;
                         _visible = true;
                         AppWindow.Show();
                     }
                 }
-                else if (!inside && !_hoverHidden)
+                else if (!inside && !settingsOpen && !_hoverHidden)
                 {
                     _hoverHidden = true;
                     _visible = false;
@@ -533,6 +580,12 @@ public partial class WidgetWindow : Window
 
     [DllImport("user32.dll")]
     private static extern int GetClassNameW(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsWindowVisible(IntPtr hWnd);
 
     private const uint GA_ROOT = 2;
     private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;

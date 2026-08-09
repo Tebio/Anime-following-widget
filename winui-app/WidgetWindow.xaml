@@ -14,9 +14,8 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- 系统托盘 -->
-        <tb:TaskbarIcon x:Name="TrayIcon" ToolTipText="追番周表" x:FieldModifier="public"
-                        IconSource="ms-appx:///Assets/app.png">
+        <!-- 系统托盘（图标在代码里用 System.Drawing.Icon 喂，ms-appx URI 在非打包应用下解析不了） -->
+        <tb:TaskbarIcon x:Name="TrayIcon" ToolTipText="追番周表" x:FieldModifier="public">
             <tb:TaskbarIcon.ContextFlyout>
                 <MenuFlyout>
                     <MenuFlyoutItem Text="显示 / 隐藏" Click="Tray_Toggle"/>
