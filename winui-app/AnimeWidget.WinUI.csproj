@@ -21,9 +21,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- WASDK 1.8（Win10 久经考验线）+ 系统装 Windows App Runtime（DeskBox 同款分发）。
-         版本对齐用户机器已装的 1.8 运行时 8000.921.x，别超过它 -->
-    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260529003" />
+    <!-- DeskBox 实证可用配置：WASDK 2.2 + 系统 Windows App Runtime 2.x（用户机器已装） -->
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.2.0" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.28000.2270" />
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
     <PackageReference Include="HtmlAgilityPack" Version="1.11.74" />
