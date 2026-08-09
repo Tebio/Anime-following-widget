@@ -394,21 +394,33 @@ public partial class WidgetWindow : Window
             bool inside = cur.X >= pos.X && cur.X <= pos.X + size.Width
                        && cur.Y >= pos.Y && cur.Y <= pos.Y + size.Height;
 
-            // 悬停显示：平时全透，光标进入区域浮现（轮询实现，窗口被遮挡也能探到）
+            // 悬停显示：平时 Hide，光标进入区域且正下方是桌面才浮现。
+            // 用 AppWindow.Hide/Show 不用分层 alpha（alpha+DComp 在 Win10 上有概率整个窗消失）。
+            // WindowFromPoint 门控：光标压在别的应用窗口上时不抢戏（对齐酷呆行为）。
             if (_settings.HoverReveal)
             {
-                byte target = inside ? CurrentNormalAlpha() : (byte)0;
-                if (inside == _hoverHidden) // 状态需要翻转
+                if (inside && _hoverHidden)
                 {
-                    SetExStyle(WS_EX_LAYERED, true);
-                    SetLayeredWindowAttributes(_hwnd, 0, target, LWA_ALPHA);
-                    _hoverHidden = !inside;
+                    var root = GetAncestor(WindowFromPoint(cur), GA_ROOT);
+                    if (root == _hwnd || IsShellWindow(root))
+                    {
+                        _hoverHidden = false;
+                        _visible = true;
+                        AppWindow.Show();
+                    }
+                }
+                else if (!inside && !_hoverHidden)
+                {
+                    _hoverHidden = true;
+                    _visible = false;
+                    AppWindow.Hide();
                 }
             }
             else if (_hoverHidden)
             {
-                SetLayeredWindowAttributes(_hwnd, 0, CurrentNormalAlpha(), LWA_ALPHA);
                 _hoverHidden = false;
+                _visible = true;
+                AppWindow.Show();
             }
 
             // 贴边隐藏：贴着屏幕边且光标远离 → 缩成 6px 细条；光标靠近 → 滑回
@@ -449,6 +461,15 @@ public partial class WidgetWindow : Window
         _settings.BlurMode == 0
             ? (byte)Math.Clamp(_settings.WindowOpacity * 255, 60, 255)
             : (byte)255;
+
+    private static bool IsShellWindow(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero) return false;
+        var sb = new System.Text.StringBuilder(64);
+        _ = GetClassNameW(hwnd, sb, sb.Capacity);
+        var cls = sb.ToString();
+        return cls is "Progman" or "WorkerW" or "SHELLDLL_DefView";
+    }
 
     private void SetExStyle(uint flag, bool on)
     {
@@ -504,5 +525,15 @@ public partial class WidgetWindow : Window
     [DllImport("dwmapi.dll")]
     private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int value, int size);
 
+    [DllImport("user32.dll")]
+    private static extern IntPtr WindowFromPoint(POINT pt);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr GetAncestor(IntPtr hwnd, uint gaFlags);
+
+    [DllImport("user32.dll")]
+    private static extern int GetClassNameW(IntPtr hWnd, System.Text.StringBuilder lpClassName, int nMaxCount);
+
+    private const uint GA_ROOT = 2;
     private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
 }

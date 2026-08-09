@@ -35,6 +35,7 @@
 
   <ItemGroup>
     <Content Include="Assets\app.ico" />
+    <Content Include="Assets\app.png" />
   </ItemGroup>
 
 </Project>
