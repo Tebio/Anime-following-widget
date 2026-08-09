@@ -14,6 +14,10 @@ on:
   push:
     branches:
       - main
+    paths:
+      # 存档线：只有真改 AnimeWidgetDesktop 才构建，不再每次 push 都白白产出 126MB artifact
+      - "AnimeWidgetDesktop/**"
+      - ".github/workflows/build-windows.yml"
     tags:
       # C# 版已废弃，只对 v1.x 标签发版；v2+ 由 build-rust-windows.yml 负责
       - "v1.*"
