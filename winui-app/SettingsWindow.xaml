@@ -12,6 +12,10 @@
             <StackPanel Spacing="8">
                 <TextBlock Text="外观" FontSize="13" FontWeight="SemiBold"
                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                <StackPanel Spacing="6">
+                    <TextBlock Text="界面效果" FontSize="12"/>
+                    <StackPanel x:Name="MaterialPanel" Orientation="Horizontal" Spacing="6"/>
+                </StackPanel>
                 <StackPanel Spacing="2">
                     <TextBlock x:Name="OpacityLabel" FontSize="12"/>
                     <Slider x:Name="OpacitySlider" Minimum="30" Maximum="100" StepFrequency="1"

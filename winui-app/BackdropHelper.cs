@@ -13,12 +13,24 @@ public static class BackdropHelper
 {
     // 控制器必须保活，否则 GC 后材质消失
     private static readonly List<DesktopAcrylicController> _keepAlive = new();
+    private static readonly Dictionary<Window, DesktopAcrylicController> _byWindow = new();
 
-    public static string ApplyDarkAcrylic(Window window)
+    /// <summary>界面效果：0=透明卡片 1=毛玻璃(Thin 弱着色) 2=亚克力(Base 深色)</summary>
+    public static string ApplyMaterial(Window window, int mode)
     {
+        // 先拆掉旧控制器（切换模式）
+        if (_byWindow.Remove(window, out var old))
+        {
+            try { old.RemoveAllSystemBackdropTargets(); old.Dispose(); } catch { }
+            _keepAlive.Remove(old);
+        }
+        window.SystemBackdrop = null;
+
         try
         {
-            if (Environment.OSVersion.Version.Build >= 22000 && MicaController.IsSupported())
+            if (mode == 0) return "Transparent";
+
+            if (mode == 2 && Environment.OSVersion.Version.Build >= 22000 && MicaController.IsSupported())
             {
                 window.SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop
                 {
@@ -34,16 +46,21 @@ public static class BackdropHelper
                     IsInputActive = true, // 桌面挂件失焦也保持材质
                     Theme = SystemBackdropTheme.Dark,
                 };
-                var controller = new DesktopAcrylicController { Kind = DesktopAcrylicKind.Base };
+                var controller = new DesktopAcrylicController
+                {
+                    Kind = mode == 1 ? DesktopAcrylicKind.Thin : DesktopAcrylicKind.Base
+                };
                 if (!controller.AddSystemBackdropTarget(target)) return "Solid";
                 controller.SetSystemBackdropConfiguration(config);
                 var tint = Windows.UI.Color.FromArgb(255, 0x1F, 0x28, 0x38); // 优效灰蓝
                 controller.TintColor = tint;
                 controller.FallbackColor = tint;
-                controller.TintOpacity = 0.45f;
-                controller.LuminosityOpacity = 0.25f;
+                // 毛玻璃=弱着色重模糊；亚克力=深着色
+                controller.TintOpacity = mode == 1 ? 0.15f : 0.45f;
+                controller.LuminosityOpacity = mode == 1 ? 0.50f : 0.25f;
                 _keepAlive.Add(controller);
-                return "Acrylic";
+                _byWindow[window] = controller;
+                return mode == 1 ? "Blur" : "Acrylic";
             }
         }
         catch (Exception ex) { BootLog.Log("Backdrop fail: " + ex.Message); }

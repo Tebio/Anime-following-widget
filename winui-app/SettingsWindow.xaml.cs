@@ -17,6 +17,8 @@ public partial class SettingsWindow : Window
     private static readonly (string Name, ClickTarget T)[] ClickTargets =
         { ("详情页", ClickTarget.Detail), ("播放页", ClickTarget.Play), ("搜索页", ClickTarget.Search) };
     private static readonly int[] Intervals = { 15, 30, 60, 120 };
+    private static readonly (string Name, int Mode)[] Materials =
+        { ("透明卡片", 0), ("毛玻璃", 1), ("亚克力", 2) };
 
     public SettingsWindow(AppSettings settings, WidgetWindow owner)
     {
@@ -25,7 +27,7 @@ public partial class SettingsWindow : Window
         _owner = owner;
 
         Root.RequestedTheme = ElementTheme.Dark;
-        BackdropHelper.ApplyDarkAcrylic(this);
+        BackdropHelper.ApplyMaterial(this, 2); // 设置窗固定亚克力
 
         ExtendsContentIntoTitleBar = true;
         if (AppWindow.Presenter is OverlappedPresenter p)
@@ -41,6 +43,15 @@ public partial class SettingsWindow : Window
         // 透明度
         OpacitySlider.Value = Math.Round(_settings.WindowOpacity * 100);
         OpacityLabel.Text = $"窗口透明度 {OpacitySlider.Value:0}%（亚克力背景下调低更透）";
+
+        // 界面效果
+        foreach (var (name, mode) in Materials)
+        {
+            var b = MakePill(name, _settings.BlurMode == mode);
+            b.Tag = mode;
+            b.Click += Material_Click;
+            MaterialPanel.Children.Add(b);
+        }
 
         // 强调色
         for (int i = 0; i < AppSettings.Accents.Length; i++)
@@ -126,6 +137,16 @@ public partial class SettingsWindow : Window
                     bd.BorderBrush = new SolidColorBrush(i == idx ? Microsoft.UI.Colors.White : Microsoft.UI.Colors.Transparent);
             RestylePanel(ClickTargetPanel, _settings.ClickTarget);
             RestylePanel(IntervalPanel, _settings.RefreshMinutes);
+            Save();
+        }
+    }
+
+    private void Material_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is Button { Tag: int mode })
+        {
+            _settings.BlurMode = mode;
+            RestylePanel(MaterialPanel, mode);
             Save();
         }
     }

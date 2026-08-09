@@ -48,12 +48,11 @@ public partial class WidgetWindow : Window
         // ---- 深色主题（WinUI3 里 Application.RequestedTheme 靠不住，必须在根元素上设） ----
         RootGrid.RequestedTheme = ElementTheme.Dark;
 
-        // ---- 材质：composition 控制器路线（XAML 包装类不暴露 Tint 属性） ----
-        BootLog.Log("Backdrop: " + BackdropHelper.ApplyDarkAcrylic(this));
+        // ---- 材质（设置里可切：0透明卡片/1毛玻璃/2亚克力） ----
+        BootLog.Log("Backdrop: " + BackdropHelper.ApplyMaterial(this, _settings.BlurMode));
 
-        // ---- 全窗口拖拽：根 Grid 为拖拽区；SetBorderAndTitleBar(false,false) 彻底卸系统框 ----
+        // ---- 卸系统框 + 手动拖拽（SetTitleBar 在无标题框下会失效，改 WM_NCLBUTTONDOWN 手动拖） ----
         ExtendsContentIntoTitleBar = true;
-        SetTitleBar(RootGrid);
         if (AppWindow.Presenter is OverlappedPresenter p)
         {
             p.SetBorderAndTitleBar(false, false); // 否则失焦时右上角浮出原生 X（"两个X"根因）
@@ -61,6 +60,10 @@ public partial class WidgetWindow : Window
             p.IsMaximizable = false;
             p.IsMinimizable = false;
         }
+        // 白边根因：WS_DLGFRAME/WS_THICKFRAME 残留在 —— Win32 层清掉
+        uint st = (uint)GetWindowLongPtrW(_hwnd, GWL_STYLE);
+        _ = SetWindowLongPtrW(_hwnd, GWL_STYLE, (IntPtr)(ulong)(st & ~(WS_DLGFRAME | WS_THICKFRAME | WS_BORDER)));
+        RootGrid.PointerPressed += Root_Drag;
         AppWindow.Resize(new SizeInt32(360, 540));
         try
         {
@@ -105,13 +108,18 @@ public partial class WidgetWindow : Window
 
     public void ApplySettings()
     {
-        RootGrid.Opacity = Math.Clamp(_settings.WindowOpacity, 0.2, 1.0);
+        BackdropHelper.ApplyMaterial(this, _settings.BlurMode);
+        // 透明卡片模式：给根面板一个半透明深色底（v3.16.1 观感）；其余模式交给材质
+        RootGrid.Background = _settings.BlurMode == 0
+            ? new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(
+                (byte)Math.Clamp(_settings.WindowOpacity * 255, 40, 255), 0x1F, 0x28, 0x38))
+            : null;
+        RootGrid.Opacity = _settings.BlurMode == 0 ? 1.0 : Math.Clamp(_settings.WindowOpacity, 0.2, 1.0);
         var (r, g, b) = _settings.AccentRgb;
         var accent = new SolidColorBrush(Windows.UI.Color.FromArgb(255, r, g, b));
         AccentDot.Fill = accent;
         UpdateTabStyles();
         ApplyClickThrough(_settings.ClickThrough);
-        ApplyLock(_settings.Locked);
         _sched.SetInterval(_settings.RefreshMinutes);
     }
 
@@ -243,11 +251,20 @@ public partial class WidgetWindow : Window
             await Windows.System.Launcher.LaunchUriAsync(new Uri(row.Url));
     }
 
-    // ---------- Win32：鼠标穿透 / 锁定位置 ----------
+    // ---------- Win32：鼠标穿透 / 手动拖拽 ----------
 
     private void ApplyClickThrough(bool on) => SetExStyle(WS_EX_TRANSPARENT, on);
 
-    public void ApplyLock(bool locked) => SetTitleBar(locked ? null : RootGrid);
+    // 手动拖拽：无标题框下 SetTitleBar 失效，PointerPressed + HTCAPTION 是可靠替代。
+    // 按钮/输入框/列表项会吃掉 PointerPressed，所以只有空白区/纯文本区触发拖拽。
+    private void Root_Drag(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (_settings.Locked) return;
+        var pt = e.GetCurrentPoint(RootGrid);
+        if (!pt.Properties.IsLeftButtonPressed) return;
+        ReleaseCapture();
+        _ = SendMessageW(_hwnd, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero);
+    }
 
     private void SetExStyle(uint flag, bool on)
     {
@@ -257,11 +274,23 @@ public partial class WidgetWindow : Window
     }
 
     private const int GWL_EXSTYLE = -20;
+    private const int GWL_STYLE = -16;
     private const uint WS_EX_TRANSPARENT = 0x20;
+    private const uint WS_DLGFRAME = 0x00400000;
+    private const uint WS_THICKFRAME = 0x00040000;
+    private const uint WS_BORDER = 0x00800000;
+    private const int WM_NCLBUTTONDOWN = 0x00A1;
+    private const int HTCAPTION = 2;
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern IntPtr GetWindowLongPtrW(IntPtr hWnd, int nIndex);
 
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
     private static extern IntPtr SetWindowLongPtrW(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessageW(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool ReleaseCapture();
 }
