@@ -49,7 +49,7 @@ public partial class WidgetWindow : Window
         RootGrid.RequestedTheme = ElementTheme.Dark;
 
         // ---- 材质（设置里可切：0透明卡片/1毛玻璃/2亚克力） ----
-        BootLog.Log("Backdrop: " + BackdropHelper.ApplyMaterial(this, _settings.BlurMode));
+        BootLog.Log("Backdrop: " + BackdropHelper.ApplyMaterial(this, _settings.BlurMode, _settings.BgDarkness));
 
         // ---- 卸系统框 + 手动拖拽（SetTitleBar 在无标题框下会失效，改 WM_NCLBUTTONDOWN 手动拖） ----
         ExtendsContentIntoTitleBar = true;
@@ -63,7 +63,7 @@ public partial class WidgetWindow : Window
         // 白边根因：WS_DLGFRAME/WS_THICKFRAME 残留在 —— Win32 层清掉
         uint st = (uint)GetWindowLongPtrW(_hwnd, GWL_STYLE);
         _ = SetWindowLongPtrW(_hwnd, GWL_STYLE, (IntPtr)(ulong)(st & ~(WS_DLGFRAME | WS_THICKFRAME | WS_BORDER)));
-        RootGrid.PointerPressed += Root_Drag;
+        RootGrid.PointerPressed += Root_PointerPressed;
         AppWindow.Resize(new SizeInt32(360, 540));
         try
         {
@@ -108,11 +108,12 @@ public partial class WidgetWindow : Window
 
     public void ApplySettings()
     {
-        BackdropHelper.ApplyMaterial(this, _settings.BlurMode);
+        BackdropHelper.ApplyMaterial(this, _settings.BlurMode, _settings.BgDarkness);
         // 透明卡片模式：给根面板一个半透明深色底（v3.16.1 观感）；其余模式交给材质
+        var bg = BackdropHelper.BgColor(_settings.BgDarkness);
         RootGrid.Background = _settings.BlurMode == 0
-            ? new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(
-                (byte)Math.Clamp(_settings.WindowOpacity * 255, 40, 255), 0x1F, 0x28, 0x38))
+            ? new SolidColorBrush(Windows.UI.Color.FromArgb(
+                (byte)Math.Clamp(_settings.WindowOpacity * 255, 40, 255), bg.R, bg.G, bg.B))
             : null;
         RootGrid.Opacity = _settings.BlurMode == 0 ? 1.0 : Math.Clamp(_settings.WindowOpacity, 0.2, 1.0);
         var (r, g, b) = _settings.AccentRgb;
@@ -251,19 +252,77 @@ public partial class WidgetWindow : Window
             await Windows.System.Launcher.LaunchUriAsync(new Uri(row.Url));
     }
 
-    // ---------- Win32：鼠标穿透 / 手动拖拽 ----------
+    // ---------- Win32：鼠标穿透 / 自绘拖拽与边缘缩放 ----------
 
     private void ApplyClickThrough(bool on) => SetExStyle(WS_EX_TRANSPARENT, on);
 
-    // 手动拖拽：无标题框下 SetTitleBar 失效，PointerPressed + HTCAPTION 是可靠替代。
-    // 按钮/输入框/列表项会吃掉 PointerPressed，所以只有空白区/纯文本区触发拖拽。
-    private void Root_Drag(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    // 自绘拖拽+缩放：PointerPressed 记录起点，移动超阈值才启动（点击不受影响）。
+    // 距边 8px 内=缩放（左/上边同步移动窗口），其余=移动。锁定时全部禁用。
+    private const double EdgeThreshold = 8;
+    private const double DragThreshold = 4;
+    private bool _opActive;
+    private bool _opStarted;
+    private bool _opLeft, _opRight, _opTop, _opBottom;
+    private Windows.Foundation.Point _opStart;
+    private PointInt32 _opWinPos;
+    private SizeInt32 _opWinSize;
+
+    private void Root_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
     {
         if (_settings.Locked) return;
         var pt = e.GetCurrentPoint(RootGrid);
         if (!pt.Properties.IsLeftButtonPressed) return;
-        ReleaseCapture();
-        _ = SendMessageW(_hwnd, WM_NCLBUTTONDOWN, (IntPtr)HTCAPTION, IntPtr.Zero);
+        _opActive = true;
+        _opStarted = false;
+        _opStart = pt.Position;
+        var w = RootGrid.ActualWidth; var h = RootGrid.ActualHeight;
+        _opLeft = pt.Position.X < EdgeThreshold;
+        _opRight = pt.Position.X > w - EdgeThreshold;
+        _opTop = pt.Position.Y < EdgeThreshold;
+        _opBottom = pt.Position.Y > h - EdgeThreshold;
+        _opWinPos = AppWindow.Position;
+        _opWinSize = AppWindow.Size;
+        RootGrid.CapturePointer(e.Pointer);
+        RootGrid.PointerMoved += Root_PointerMoved;
+        RootGrid.PointerReleased += Root_PointerReleased;
+        RootGrid.PointerCaptureLost += Root_PointerReleased;
+    }
+
+    private void Root_PointerMoved(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        if (!_opActive) return;
+        var pt = e.GetCurrentPoint(RootGrid);
+        double dx = pt.Position.X - _opStart.X, dy = pt.Position.Y - _opStart.Y;
+        if (!_opStarted)
+        {
+            if (Math.Abs(dx) < DragThreshold && Math.Abs(dy) < DragThreshold) return;
+            _opStarted = true;
+        }
+        double scale = RootGrid.XamlRoot?.RasterizationScale ?? 1.0;
+        int px = (int)Math.Round(dx * scale), py = (int)Math.Round(dy * scale);
+
+        int x = _opWinPos.X, y = _opWinPos.Y, w = _opWinSize.Width, h = _opWinSize.Height;
+        if (_opLeft || _opRight || _opTop || _opBottom)
+        {
+            // 缩放（最小 280x300）
+            if (_opRight) w = Math.Max(280, _opWinSize.Width + px);
+            if (_opBottom) h = Math.Max(300, _opWinSize.Height + py);
+            if (_opLeft) { int nw = Math.Max(280, _opWinSize.Width - px); x += _opWinSize.Width - nw; w = nw; }
+            if (_opTop) { int nh = Math.Max(300, _opWinSize.Height - py); y += _opWinSize.Height - nh; h = nh; }
+            AppWindow.MoveAndResize(new RectInt32(x, y, w, h));
+        }
+        else
+        {
+            AppWindow.Move(new PointInt32(x + px, y + py));
+        }
+    }
+
+    private void Root_PointerReleased(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
+    {
+        _opActive = false;
+        RootGrid.PointerMoved -= Root_PointerMoved;
+        RootGrid.PointerReleased -= Root_PointerReleased;
+        RootGrid.PointerCaptureLost -= Root_PointerReleased;
     }
 
     private void SetExStyle(uint flag, bool on)
@@ -279,18 +338,10 @@ public partial class WidgetWindow : Window
     private const uint WS_DLGFRAME = 0x00400000;
     private const uint WS_THICKFRAME = 0x00040000;
     private const uint WS_BORDER = 0x00800000;
-    private const int WM_NCLBUTTONDOWN = 0x00A1;
-    private const int HTCAPTION = 2;
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern IntPtr GetWindowLongPtrW(IntPtr hWnd, int nIndex);
 
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
     private static extern IntPtr SetWindowLongPtrW(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
-
-    [DllImport("user32.dll")]
-    private static extern IntPtr SendMessageW(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
-
-    [DllImport("user32.dll")]
-    private static extern bool ReleaseCapture();
 }

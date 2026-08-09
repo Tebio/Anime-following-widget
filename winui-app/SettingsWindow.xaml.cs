@@ -44,6 +44,10 @@ public partial class SettingsWindow : Window
         OpacitySlider.Value = Math.Round(_settings.WindowOpacity * 100);
         OpacityLabel.Text = $"窗口透明度 {OpacitySlider.Value:0}%（亚克力背景下调低更透）";
 
+        // 背景深浅
+        DarknessSlider.Value = Math.Round(_settings.BgDarkness * 100);
+        DarknessLabel.Text = $"背景深浅 {DarknessSlider.Value:0}%（浅蓝灰 ↔ 深黑）";
+
         // 界面效果
         foreach (var (name, mode) in Materials)
         {
@@ -176,6 +180,14 @@ public partial class SettingsWindow : Window
         if (!_ready) return;
         _settings.WindowOpacity = e.NewValue / 100.0;
         OpacityLabel.Text = $"窗口透明度 {e.NewValue:0}%（亚克力背景下调低更透）";
+        Save();
+    }
+
+    private void Darkness_Changed(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e)
+    {
+        if (!_ready) return;
+        _settings.BgDarkness = e.NewValue / 100.0;
+        DarknessLabel.Text = $"背景深浅 {e.NewValue:0}%（浅蓝灰 ↔ 深黑）";
         Save();
     }
 

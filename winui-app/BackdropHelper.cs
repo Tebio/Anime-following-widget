@@ -15,8 +15,15 @@ public static class BackdropHelper
     private static readonly List<DesktopAcrylicController> _keepAlive = new();
     private static readonly Dictionary<Window, DesktopAcrylicController> _byWindow = new();
 
+    /// <summary>背景深浅 0(浅蓝灰)~1(深黑)，v3.16.1 同款公式</summary>
+    public static Windows.UI.Color BgColor(double darkness)
+    {
+        int v = (int)(40 - 30 * Math.Clamp(darkness, 0, 1));
+        return Windows.UI.Color.FromArgb(255, (byte)v, (byte)(v + 4), (byte)(v + 16));
+    }
+
     /// <summary>界面效果：0=透明卡片 1=毛玻璃(Thin 弱着色) 2=亚克力(Base 深色)</summary>
-    public static string ApplyMaterial(Window window, int mode)
+    public static string ApplyMaterial(Window window, int mode, double darkness = 0.55)
     {
         // 先拆掉旧控制器（切换模式）
         if (_byWindow.Remove(window, out var old))
@@ -52,7 +59,7 @@ public static class BackdropHelper
                 };
                 if (!controller.AddSystemBackdropTarget(target)) return "Solid";
                 controller.SetSystemBackdropConfiguration(config);
-                var tint = Windows.UI.Color.FromArgb(255, 0x1F, 0x28, 0x38); // 优效灰蓝
+                var tint = BgColor(darkness);
                 controller.TintColor = tint;
                 controller.FallbackColor = tint;
                 // 毛玻璃=弱着色重模糊；亚克力=深着色
