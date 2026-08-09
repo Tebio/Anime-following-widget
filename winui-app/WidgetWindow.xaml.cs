@@ -63,6 +63,9 @@ public partial class WidgetWindow : Window
         // 边框样式：保留 WS_THICKFRAME（系统边缘缩放需要它），清 DLGFRAME/BORDER（白边根因）
         uint st = (uint)GetWindowLongPtrW(_hwnd, GWL_STYLE);
         _ = SetWindowLongPtrW(_hwnd, GWL_STYLE, (IntPtr)(ulong)((st | WS_THICKFRAME) & ~(WS_DLGFRAME | WS_BORDER)));
+        // 任务栏不显示（托盘已够）：WS_EX_TOOLWINDOW；Alt+Tab 也藏掉
+        AppWindow.IsShownInSwitchers = false;
+        SetExStyle(WS_EX_TOOLWINDOW, true);
         AppWindow.Resize(new SizeInt32(360, 540));
 
         // ---- 原生级拖拽+八向缩放：NonClientPointerSource 区域（无标题栏窗口的正解） ----
@@ -70,17 +73,12 @@ public partial class WidgetWindow : Window
         RootGrid.SizeChanged += (_, _) => { UpdateInputRegions(); ApplyRoundedRegion(); };
         TabPanel.Loaded += (_, _) => UpdateInputRegions();
 
-        // ---- 贴边磁吸：拖动松手后吸附屏幕边 ----
-        _snapTimer = DispatcherQueue.CreateTimer();
-        _snapTimer.Interval = TimeSpan.FromMilliseconds(350);
-        _snapTimer.IsRepeating = false;
-        _snapTimer.Tick += (_, _) => SnapToEdges();
-        AppWindow.Changed += (_, a) => { if (a.DidPositionChange && !_snapping) { _snapTimer.Stop(); _snapTimer.Start(); } };
+        // ---- 贴边磁吸由轮询驱动（见 SnapTick），不再依赖 AppWindow.Changed ----
 
         // ---- 悬停显示/贴边隐藏：光标轮询（不依赖窗口消息，被遮挡也能探到） ----
         _pollTimer = DispatcherQueue.CreateTimer();
         _pollTimer.Interval = TimeSpan.FromMilliseconds(150);
-        _pollTimer.Tick += (_, _) => PollCursor();
+        _pollTimer.Tick += (_, _) => { PollCursor(); SnapTick(); };
         _pollTimer.Start();
         try
         {
@@ -253,10 +251,16 @@ public partial class WidgetWindow : Window
 
     private void Settings_Click(object sender, RoutedEventArgs e)
     {
-        if (_settingsWin != null) { _settingsWin.Activate(); return; }
-        _settingsWin = new SettingsWindow(_settings, this);
-        _settingsWin.Closed += (_, _) => _settingsWin = null;
-        _settingsWin.Activate();
+        try
+        {
+            BootLog.Log("Settings_Click enter, existing=" + (_settingsWin != null));
+            if (_settingsWin != null) { _settingsWin.Activate(); return; }
+            _settingsWin = new SettingsWindow(_settings, this);
+            _settingsWin.Closed += (_, _) => _settingsWin = null;
+            _settingsWin.Activate();
+            BootLog.Log("Settings opened");
+        }
+        catch (Exception ex) { BootLog.Log("Settings FAIL: " + ex); }
     }
 
     private void Hide_Click(object sender, RoutedEventArgs e) => ToggleVisibility();
@@ -395,28 +399,53 @@ public partial class WidgetWindow : Window
         catch { }
     }
 
-    // ---------- 贴边磁吸 ----------
+    // ---------- 贴边磁吸 + 出屏回弹（轮询版：位置停稳 400ms 后执行） ----------
 
-    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _snapTimer;
     private bool _snapping;
+    private PointInt32 _lastPos = new(-1, -1);
+    private DateTime _lastMoveAt = DateTime.MinValue;
 
-    private void SnapToEdges()
+    private void SnapTick()
     {
         if (_edgeHidden) return;
         try
         {
+            var pos = AppWindow.Position;
+            if (pos.X != _lastPos.X || pos.Y != _lastPos.Y)
+            {
+                _lastPos = pos;
+                _lastMoveAt = DateTime.UtcNow;
+                return; // 还在动
+            }
+            if (_snapping || (DateTime.UtcNow - _lastMoveAt).TotalMilliseconds < 400 || _lastMoveAt == DateTime.MinValue)
+                return;
+
             var wa = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
-            var pos = AppWindow.Position; var size = AppWindow.Size;
+            var size = AppWindow.Size;
             const int snap = 16;
             int nx = pos.X, ny = pos.Y;
-            if (Math.Abs(pos.X - wa.X) < snap) nx = wa.X;
-            else if (Math.Abs(pos.X + size.Width - (wa.X + wa.Width)) < snap) nx = wa.X + wa.Width - size.Width;
-            if (Math.Abs(pos.Y - wa.Y) < snap) ny = wa.Y;
-            else if (Math.Abs(pos.Y + size.Height - (wa.Y + wa.Height)) < snap) ny = wa.Y + wa.Height - size.Height;
+
+            // 出屏回弹：超过一半在可视区外 → 拉回
+            int visibleW = Math.Min(pos.X + size.Width, wa.X + wa.Width) - Math.Max(pos.X, wa.X);
+            int visibleH = Math.Min(pos.Y + size.Height, wa.Y + wa.Height) - Math.Max(pos.Y, wa.Y);
+            if (visibleW < size.Width / 2 || visibleH < size.Height / 2)
+            {
+                nx = Math.Clamp(pos.X, wa.X, wa.X + wa.Width - size.Width);
+                ny = Math.Clamp(pos.Y, wa.Y, wa.Y + wa.Height - size.Height);
+            }
+            else
+            {
+                // 贴边磁吸 16px
+                if (Math.Abs(pos.X - wa.X) < snap) nx = wa.X;
+                else if (Math.Abs(pos.X + size.Width - (wa.X + wa.Width)) < snap) nx = wa.X + wa.Width - size.Width;
+                if (Math.Abs(pos.Y - wa.Y) < snap) ny = wa.Y;
+                else if (Math.Abs(pos.Y + size.Height - (wa.Y + wa.Height)) < snap) ny = wa.Y + wa.Height - size.Height;
+            }
             if (nx != pos.X || ny != pos.Y)
             {
                 _snapping = true;
                 AppWindow.Move(new PointInt32(nx, ny));
+                _lastPos = new PointInt32(nx, ny);
                 _snapping = false;
             }
         }
@@ -525,6 +554,7 @@ public partial class WidgetWindow : Window
     private const int GWL_STYLE = -16;
     private const uint WS_EX_TRANSPARENT = 0x20;
     private const uint WS_EX_LAYERED = 0x00080000;
+    private const uint WS_EX_TOOLWINDOW = 0x00000080;
     private const uint LWA_ALPHA = 0x2;
     private const uint WS_DLGFRAME = 0x00400000;
     private const uint WS_THICKFRAME = 0x00040000;
