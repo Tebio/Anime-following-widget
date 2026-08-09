@@ -3,9 +3,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:AnimeWidget"
         Title="设置" Width="400" Height="680"
-        Background="#FF161A22" Foreground="#EDEDF2"
+        Background="#FF1F2838" Foreground="#EDEDF2"
         FontFamily="Microsoft YaHei UI"
         TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType"
+        UseLayoutRounding="True" SnapsToDevicePixels="True"
         WindowStyle="None" ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner">
     <Window.Resources>
@@ -166,7 +167,7 @@
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <Border Background="#FF12151B" MouseLeftButtonDown="Header_Drag">
+            <Border Background="#FF1A2334" MouseLeftButtonDown="Header_Drag">
                 <Grid>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="13,0,0,0">
                         <Ellipse Width="8" Height="8" Fill="{StaticResource AccentBrush}"/>

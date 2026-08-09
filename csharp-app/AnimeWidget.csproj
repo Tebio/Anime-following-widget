@@ -9,10 +9,10 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>AnimeWidget</RootNamespace>
     <AssemblyName>AnimeWidget</AssemblyName>
-    <Version>3.16.4</Version>
+    <Version>3.16.5</Version>
     <Description>追番桌面卡片 — AGE 动漫周表（C# WPF 版）</Description>
-    <!-- 不要加 ApplicationManifest：自定义 manifest 嵌进单文件 exe 会导致启动即崩
-         （DllNotFoundException @ HwndSubclass，v3.16.3 实测）。DPI 感知走 App.xaml.cs 的运行时 API -->
+    <!-- DPI 感知走 App.xaml.cs 运行时 API（SetProcessDpiAwarenessContext）。
+         注：v3.16.x 排查终局——当晚所有"打不开"实为系统级单文件加载卡死，与 manifest/代码无关 -->
 
     <!-- 单文件发布 -->
     <PublishSingleFile>true</PublishSingleFile>
