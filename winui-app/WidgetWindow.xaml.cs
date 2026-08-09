@@ -60,9 +60,9 @@ public partial class WidgetWindow : Window
             p.IsMaximizable = false;
             p.IsMinimizable = false;
         }
-        // 白边根因：WS_DLGFRAME/WS_THICKFRAME 残留在 —— Win32 层清掉
+        // 边框样式：保留 WS_THICKFRAME（系统边缘缩放需要它），清 DLGFRAME/BORDER（白边根因）
         uint st = (uint)GetWindowLongPtrW(_hwnd, GWL_STYLE);
-        _ = SetWindowLongPtrW(_hwnd, GWL_STYLE, (IntPtr)(ulong)(st & ~(WS_DLGFRAME | WS_THICKFRAME | WS_BORDER)));
+        _ = SetWindowLongPtrW(_hwnd, GWL_STYLE, (IntPtr)(ulong)((st | WS_THICKFRAME) & ~(WS_DLGFRAME | WS_BORDER)));
         RootGrid.PointerPressed += Root_PointerPressed;
         AppWindow.Resize(new SizeInt32(360, 540));
         try
@@ -108,14 +108,28 @@ public partial class WidgetWindow : Window
 
     public void ApplySettings()
     {
-        BackdropHelper.ApplyMaterial(this, _settings.BlurMode, _settings.BgDarkness);
-        // 透明卡片模式：给根面板一个半透明深色底（v3.16.1 观感）；其余模式交给材质
+        BackdropHelper.ApplyMaterial(this, _settings.BlurMode, _settings.BgDarkness, _settings.WindowOpacity);
         var bg = BackdropHelper.BgColor(_settings.BgDarkness);
-        RootGrid.Background = _settings.BlurMode == 0
-            ? new SolidColorBrush(Windows.UI.Color.FromArgb(
-                (byte)Math.Clamp(_settings.WindowOpacity * 255, 40, 255), bg.R, bg.G, bg.B))
-            : null;
-        RootGrid.Opacity = _settings.BlurMode == 0 ? 1.0 : Math.Clamp(_settings.WindowOpacity, 0.2, 1.0);
+        if (_settings.BlurMode == 0)
+        {
+            // 透明卡片：WinUI3 无 backdrop 时 swapchain 不透明，XAML 半透明刷无效 ——
+            // 必须分层窗口整体 alpha（WPF 3.16.1 同款机制），文字随窗口统一通透
+            RootGrid.Background = new SolidColorBrush(Windows.UI.Color.FromArgb(255, bg.R, bg.G, bg.B));
+            SetExStyle(WS_EX_LAYERED, true);
+            SetLayeredWindowAttributes(_hwnd, 0, (byte)Math.Clamp(_settings.WindowOpacity * 255, 60, 255), LWA_ALPHA);
+        }
+        else
+        {
+            RootGrid.Background = null; // 交给材质
+            uint ex = (uint)GetWindowLongPtrW(_hwnd, GWL_EXSTYLE);
+            if ((ex & WS_EX_LAYERED) != 0)
+            {
+                _ = SetWindowLongPtrW(_hwnd, GWL_EXSTYLE, (IntPtr)(ulong)(ex & ~WS_EX_LAYERED));
+                SetWindowPos(_hwnd, IntPtr.Zero, 0, 0, 0, 0,
+                    (uint)(SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_FRAMECHANGED));
+            }
+        }
+        RootGrid.Opacity = 1.0; // 透明度走窗口/材质层，文字始终清晰（3.16.1 原则）
         var (r, g, b) = _settings.AccentRgb;
         var accent = new SolidColorBrush(Windows.UI.Color.FromArgb(255, r, g, b));
         AccentDot.Fill = accent;
@@ -261,11 +275,8 @@ public partial class WidgetWindow : Window
     private const double EdgeThreshold = 8;
     private const double DragThreshold = 4;
     private bool _opActive;
-    private bool _opStarted;
     private bool _opLeft, _opRight, _opTop, _opBottom;
     private Windows.Foundation.Point _opStart;
-    private PointInt32 _opWinPos;
-    private SizeInt32 _opWinSize;
 
     private void Root_PointerPressed(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
     {
@@ -280,8 +291,6 @@ public partial class WidgetWindow : Window
         _opRight = pt.Position.X > w - EdgeThreshold;
         _opTop = pt.Position.Y < EdgeThreshold;
         _opBottom = pt.Position.Y > h - EdgeThreshold;
-        _opWinPos = AppWindow.Position;
-        _opWinSize = AppWindow.Size;
         RootGrid.CapturePointer(e.Pointer);
         RootGrid.PointerMoved += Root_PointerMoved;
         RootGrid.PointerReleased += Root_PointerReleased;
@@ -293,28 +302,29 @@ public partial class WidgetWindow : Window
         if (!_opActive) return;
         var pt = e.GetCurrentPoint(RootGrid);
         double dx = pt.Position.X - _opStart.X, dy = pt.Position.Y - _opStart.Y;
-        if (!_opStarted)
-        {
-            if (Math.Abs(dx) < DragThreshold && Math.Abs(dy) < DragThreshold) return;
-            _opStarted = true;
-        }
-        double scale = RootGrid.XamlRoot?.RasterizationScale ?? 1.0;
-        int px = (int)Math.Round(dx * scale), py = (int)Math.Round(dy * scale);
+        if (Math.Abs(dx) < DragThreshold && Math.Abs(dy) < DragThreshold) return;
 
-        int x = _opWinPos.X, y = _opWinPos.Y, w = _opWinSize.Width, h = _opWinSize.Height;
-        if (_opLeft || _opRight || _opTop || _opBottom)
+        // 过了阈值：交还系统拖拽循环（自绘 Move/Resize 必闪，系统循环平滑且带吸附）
+        _opActive = false;
+        RootGrid.PointerMoved -= Root_PointerMoved;
+        RootGrid.PointerReleased -= Root_PointerReleased;
+        RootGrid.PointerCaptureLost -= Root_PointerReleased;
+        RootGrid.ReleasePointerCaptures();
+
+        int ht = (_opLeft, _opRight, _opTop, _opBottom) switch
         {
-            // 缩放（最小 280x300）
-            if (_opRight) w = Math.Max(280, _opWinSize.Width + px);
-            if (_opBottom) h = Math.Max(300, _opWinSize.Height + py);
-            if (_opLeft) { int nw = Math.Max(280, _opWinSize.Width - px); x += _opWinSize.Width - nw; w = nw; }
-            if (_opTop) { int nh = Math.Max(300, _opWinSize.Height - py); y += _opWinSize.Height - nh; h = nh; }
-            AppWindow.MoveAndResize(new RectInt32(x, y, w, h));
-        }
-        else
-        {
-            AppWindow.Move(new PointInt32(x + px, y + py));
-        }
+            (true, false, true, false) => HTTOPLEFT,
+            (true, false, false, true) => HTBOTTOMLEFT,
+            (false, true, true, false) => HTTOPRIGHT,
+            (false, true, false, true) => HTBOTTOMRIGHT,
+            (true, false, _, _) => HTLEFT,
+            (false, true, _, _) => HTRIGHT,
+            (false, false, true, false) => HTTOP,
+            (false, false, false, true) => HTBOTTOM,
+            _ => HTCAPTION,
+        };
+        ReleaseCapture();
+        _ = SendMessageW(_hwnd, WM_NCLBUTTONDOWN, (IntPtr)ht, IntPtr.Zero);
     }
 
     private void Root_PointerReleased(object sender, Microsoft.UI.Xaml.Input.PointerRoutedEventArgs e)
@@ -335,13 +345,32 @@ public partial class WidgetWindow : Window
     private const int GWL_EXSTYLE = -20;
     private const int GWL_STYLE = -16;
     private const uint WS_EX_TRANSPARENT = 0x20;
+    private const uint WS_EX_LAYERED = 0x00080000;
+    private const uint LWA_ALPHA = 0x2;
     private const uint WS_DLGFRAME = 0x00400000;
     private const uint WS_THICKFRAME = 0x00040000;
     private const uint WS_BORDER = 0x00800000;
+    private const int WM_NCLBUTTONDOWN = 0x00A1;
+    private const int HTCAPTION = 2;
+    private const int HTLEFT = 10, HTRIGHT = 11, HTTOP = 12, HTTOPLEFT = 13,
+                        HTTOPRIGHT = 14, HTBOTTOM = 15, HTBOTTOMLEFT = 16, HTBOTTOMRIGHT = 17;
+    private const int SWP_NOMOVE = 0x2, SWP_NOSIZE = 0x1, SWP_NOZORDER = 0x4, SWP_FRAMECHANGED = 0x20;
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern IntPtr GetWindowLongPtrW(IntPtr hWnd, int nIndex);
 
     [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
     private static extern IntPtr SetWindowLongPtrW(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr SendMessageW(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern bool ReleaseCapture();
+
+    [DllImport("user32.dll")]
+    private static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 }

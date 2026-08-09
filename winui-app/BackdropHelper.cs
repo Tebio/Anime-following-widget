@@ -22,19 +22,35 @@ public static class BackdropHelper
         return Windows.UI.Color.FromArgb(255, (byte)v, (byte)(v + 4), (byte)(v + 16));
     }
 
-    /// <summary>界面效果：0=透明卡片 1=毛玻璃(Thin 弱着色) 2=亚克力(Base 深色)</summary>
-    public static string ApplyMaterial(Window window, int mode, double darkness = 0.55)
+    /// <summary>界面效果：0=透明卡片 1=毛玻璃(Thin 弱着色) 2=亚克力(Base 深色)；opacity 影响着色强度</summary>
+    public static string ApplyMaterial(Window window, int mode, double darkness = 0.55, double opacity = 0.9)
     {
-        // 先拆掉旧控制器（切换模式）
-        if (_byWindow.Remove(window, out var old))
-        {
-            try { old.RemoveAllSystemBackdropTargets(); old.Dispose(); } catch { }
-            _keepAlive.Remove(old);
-        }
-        window.SystemBackdrop = null;
-
         try
         {
+            var tint = BgColor(darkness);
+            float tintOp = mode == 1 ? (float)(0.10 + 0.30 * opacity) : (float)(0.20 + 0.55 * opacity);
+            float lumOp = mode == 1 ? 0.55f : 0.25f;
+            var wantKind = mode == 1 ? DesktopAcrylicKind.Thin : DesktopAcrylicKind.Base;
+
+            // 复用现有控制器（滑杆高频调整时只更新参数，不重建——重建会闪）
+            if (mode != 0 && _byWindow.TryGetValue(window, out var existing) && !existing.IsClosed
+                && existing.Kind == wantKind)
+            {
+                existing.TintColor = tint;
+                existing.FallbackColor = tint;
+                existing.TintOpacity = tintOp;
+                existing.LuminosityOpacity = lumOp;
+                return mode == 1 ? "Blur" : "Acrylic";
+            }
+
+            // 换档/首次：拆旧控制器
+            if (_byWindow.Remove(window, out var old))
+            {
+                try { old.RemoveAllSystemBackdropTargets(); old.Dispose(); } catch { }
+                _keepAlive.Remove(old);
+            }
+            window.SystemBackdrop = null;
+
             if (mode == 0) return "Transparent";
 
             if (mode == 2 && Environment.OSVersion.Version.Build >= 22000 && MicaController.IsSupported())
@@ -59,12 +75,10 @@ public static class BackdropHelper
                 };
                 if (!controller.AddSystemBackdropTarget(target)) return "Solid";
                 controller.SetSystemBackdropConfiguration(config);
-                var tint = BgColor(darkness);
                 controller.TintColor = tint;
                 controller.FallbackColor = tint;
-                // 毛玻璃=弱着色重模糊；亚克力=深着色
-                controller.TintOpacity = mode == 1 ? 0.15f : 0.45f;
-                controller.LuminosityOpacity = mode == 1 ? 0.50f : 0.25f;
+                controller.TintOpacity = tintOp;
+                controller.LuminosityOpacity = lumOp;
                 _keepAlive.Add(controller);
                 _byWindow[window] = controller;
                 return mode == 1 ? "Blur" : "Acrylic";
