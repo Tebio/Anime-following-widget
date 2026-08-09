@@ -48,22 +48,8 @@ public partial class WidgetWindow : Window
         // ---- 深色主题（WinUI3 里 Application.RequestedTheme 靠不住，必须在根元素上设） ----
         RootGrid.RequestedTheme = ElementTheme.Dark;
 
-        // ---- 材质：Win10 Acrylic / Win11 Mica，手动给深色 Tint（默认浅色调=白窗根因） ----
-        try
-        {
-            if (Environment.OSVersion.Version.Build >= 22000 && MicaController.IsSupported())
-                SystemBackdrop = new MicaBackdrop { Kind = MicaKind.BaseAlt };
-            else if (DesktopAcrylicController.IsSupported())
-                SystemBackdrop = new DesktopAcrylicBackdrop
-                {
-                    TintColor = Windows.UI.Color.FromArgb(255, 0x1F, 0x28, 0x38),
-                    TintOpacity = 0.55f,
-                    LuminosityOpacity = 0.25f,
-                    FallbackColor = Windows.UI.Color.FromArgb(255, 0x1F, 0x28, 0x38),
-                };
-            BootLog.Log("Backdrop ok");
-        }
-        catch (Exception ex) { BootLog.Log("Backdrop fail: " + ex.Message); }
+        // ---- 材质：composition 控制器路线（XAML 包装类不暴露 Tint 属性） ----
+        BootLog.Log("Backdrop: " + BackdropHelper.ApplyDarkAcrylic(this));
 
         // ---- 全窗口拖拽：根 Grid 为拖拽区；SetBorderAndTitleBar(false,false) 彻底卸系统框 ----
         ExtendsContentIntoTitleBar = true;
