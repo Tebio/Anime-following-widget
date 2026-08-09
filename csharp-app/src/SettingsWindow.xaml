@@ -5,6 +5,7 @@
         Title="设置" Width="400" Height="680"
         Background="#FF161A22" Foreground="#EDEDF2"
         FontFamily="Microsoft YaHei UI"
+        TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType"
         WindowStyle="None" ResizeMode="NoResize"
         WindowStartupLocation="CenterOwner">
     <Window.Resources>
