@@ -284,7 +284,6 @@ public partial class WidgetWindow : Window
         var pt = e.GetCurrentPoint(RootGrid);
         if (!pt.Properties.IsLeftButtonPressed) return;
         _opActive = true;
-        _opStarted = false;
         _opStart = pt.Position;
         var w = RootGrid.ActualWidth; var h = RootGrid.ActualHeight;
         _opLeft = pt.Position.X < EdgeThreshold;
