@@ -45,22 +45,32 @@ public partial class WidgetWindow : Window
         _settings = AppSettings.Load();
         _hwnd = WindowNative.GetWindowHandle(this);
 
-        // ---- 材质：Win10 Acrylic / Win11 Mica ----
+        // ---- 深色主题（WinUI3 里 Application.RequestedTheme 靠不住，必须在根元素上设） ----
+        RootGrid.RequestedTheme = ElementTheme.Dark;
+
+        // ---- 材质：Win10 Acrylic / Win11 Mica，手动给深色 Tint（默认浅色调=白窗根因） ----
         try
         {
             if (Environment.OSVersion.Version.Build >= 22000 && MicaController.IsSupported())
                 SystemBackdrop = new MicaBackdrop { Kind = MicaKind.BaseAlt };
             else if (DesktopAcrylicController.IsSupported())
-                SystemBackdrop = new DesktopAcrylicBackdrop();
+                SystemBackdrop = new DesktopAcrylicBackdrop
+                {
+                    TintColor = Windows.UI.Color.FromArgb(255, 0x1F, 0x28, 0x38),
+                    TintOpacity = 0.55f,
+                    LuminosityOpacity = 0.25f,
+                    FallbackColor = Windows.UI.Color.FromArgb(255, 0x1F, 0x28, 0x38),
+                };
             BootLog.Log("Backdrop ok");
         }
         catch (Exception ex) { BootLog.Log("Backdrop fail: " + ex.Message); }
 
-        // ---- 全窗口拖拽：把根 Grid 设为拖拽区，交互控件（按钮/列表/输入框）天然豁免 ----
+        // ---- 全窗口拖拽：根 Grid 为拖拽区；SetBorderAndTitleBar(false,false) 彻底卸系统框 ----
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(RootGrid);
         if (AppWindow.Presenter is OverlappedPresenter p)
         {
+            p.SetBorderAndTitleBar(false, false); // 否则失焦时右上角浮出原生 X（"两个X"根因）
             p.IsResizable = false;
             p.IsMaximizable = false;
             p.IsMinimizable = false;

@@ -24,16 +24,25 @@ public partial class SettingsWindow : Window
         _settings = settings;
         _owner = owner;
 
+        Root.RequestedTheme = ElementTheme.Dark;
+
         try
         {
             if (DesktopAcrylicController.IsSupported())
-                SystemBackdrop = new DesktopAcrylicBackdrop();
+                SystemBackdrop = new DesktopAcrylicBackdrop
+                {
+                    TintColor = Windows.UI.Color.FromArgb(255, 0x1F, 0x28, 0x38),
+                    TintOpacity = 0.6f,
+                    LuminosityOpacity = 0.2f,
+                    FallbackColor = Windows.UI.Color.FromArgb(255, 0x1F, 0x28, 0x38),
+                };
         }
         catch { }
 
         ExtendsContentIntoTitleBar = true;
         if (AppWindow.Presenter is OverlappedPresenter p)
         {
+            p.SetBorderAndTitleBar(true, true); // 设置窗保留正常标题栏
             p.IsResizable = false;
             p.IsMaximizable = false;
             p.IsMinimizable = false;
