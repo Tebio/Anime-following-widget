@@ -25,7 +25,7 @@ public partial class WidgetWindow
             _settingsWin.Closed += (_, _) => _settingsWin = null;
             _settingsWin.Activate();
             // 顶到前台（无任务栏占位的应用 Activate 可能不前置，强制 SetForeground）
-            var sw = Win32Interop.GetWindowFromWindowId(_settingsWin.AppWindow.Id);
+            var sw = Microsoft.UI.Win32Interop.GetWindowFromWindowId(_settingsWin.AppWindow.Id);
             SetForegroundWindow(sw);
             BootLog.Log("Settings opened");
         }
