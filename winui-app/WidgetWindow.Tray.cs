@@ -13,29 +13,26 @@ namespace AnimeWidget.WinUI;
 
 public partial class WidgetWindow
 {
-    // ---------- 托盘（菜单代码构建，抄 DeskBox：XAML 声明的 flyout 项在窗口透明/隐藏态下 Click 不触发） ----------
+    // ---------- 托盘（菜单代码构建 + XamlUICommand） ----------
+    // 上游已知 bug（H.NotifyIcon issue #92）：MenuFlyoutItem 的 Click 事件在托盘 flyout
+    // 里不触发，必须走 Command/XamlUICommand 通道。
 
     public void SetupTray()
     {
         var menu = new MenuFlyout { ShouldConstrainToRootBounds = false };
 
-        var toggle = new MenuFlyoutItem { Text = "显示 / 隐藏" };
-        toggle.Click += (_, _) => ToggleVisibility();
+        MenuFlyoutItem Item(string text, string tag, Action act)
+        {
+            var cmd = new Microsoft.UI.Xaml.Input.XamlUICommand();
+            cmd.ExecuteRequested += (_, _) => { BootLog.Log("tray menu: " + tag); act(); };
+            return new MenuFlyoutItem { Text = text, Command = cmd };
+        }
 
-        var refresh = new MenuFlyoutItem { Text = "立即刷新" };
-        refresh.Click += (_, _) => { StatusText.Text = "刷新中…"; _sched.RefreshNow(); };
-
-        var settings = new MenuFlyoutItem { Text = "设置" };
-        settings.Click += (_, _) => Settings_Click(null!, null!);
-
-        var exit = new MenuFlyoutItem { Text = "退出" };
-        exit.Click += (_, _) => Tray_Exit(null!, null!);
-
-        menu.Items.Add(toggle);
-        menu.Items.Add(refresh);
-        menu.Items.Add(settings);
+        menu.Items.Add(Item("显示 / 隐藏", "toggle", ToggleVisibility));
+        menu.Items.Add(Item("立即刷新", "refresh", () => { StatusText.Text = "刷新中…"; _sched.RefreshNow(); }));
+        menu.Items.Add(Item("设置", "settings", () => Settings_Click(null!, null!)));
         menu.Items.Add(new MenuFlyoutSeparator());
-        menu.Items.Add(exit);
+        menu.Items.Add(Item("退出", "exit", () => Tray_Exit(null!, null!)));
 
         TrayIcon.ContextFlyout = menu;
         TrayIcon.LeftClickCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(ToggleVisibility);
