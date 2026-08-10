@@ -1,83 +1,70 @@
 # Anime-following-widget
 
-Windows 桌面追番小组件。**v2.0 Rust 完全重写**：单文件 EXE、免安装、数据直连 AGE 动漫周表。
+Windows 桌面追番小组件。数据直连 [AGE 动漫](https://www.agedm.io/) 周表（官方 App API 优先 + SSR HTML 兜底）。
 
-原 C# 版保留在 `AnimeWidgetDesktop/`（已废弃，仅存档）。
+## 三条线
 
-## C# WPF 版（v3.x 主力）
+| 线 | 状态 | 路径 |
+|---|---|---|
+| **v4.x WinUI 3** | 预览线（实机可用） | `winui-app/` |
+| **v3.x C# WPF** | 主力稳定线 | `csharp-app/` |
+| v2 Rust / v1 WinForms | 存档 | `anime-widget-rs/` / `AnimeWidgetDesktop/` |
 
-`csharp-app/` — .NET 8 + WPF 单文件 exe，与 ashare-mainline-watch 同一套桌面底座：
-MVVM 数据绑定、亚克力圆角暗色卡片、周几 pill tabs（今日标记 + 5 种强调色）、
-WorkerW 壁纸层 / 置底窗口双模式运行时切换、系统代理自动检测（注册表 + env）、
-双镜像 failover、离线缓存、托盘全功能 + 开机自启、设置窗实时生效。
+## v4.x — WinUI 3 预览线（当前开发焦点）
+
+.NET 10 + Windows App SDK 2.2，非打包单 exe 文件夹。与 v3 同一套桌面底座语义，WinUI 3 原生实现：
+
+- **三档材质**：透明卡片（分层窗口 alpha）/ 毛玻璃（弱着色重模糊）/ 亚克力（深着色磨砂，DeskBox 同款 composition 控制器接线），背景深浅滑杆三档联动
+- **窗口行为全家桶**：全窗口拖拽（InputNonClientPointerSource 原生区域）+ 四边八向缩放、贴边磁吸 16px、出屏 40px 自动回弹、贴边隐藏（缩 6px 细条）
+- **悬停显示**：3.16.1 语义——窗口原地 alpha 淡入淡出永不移动；酷呆式桌面门控（WindowFromPoint + 桌面层进程白名单），别的窗口压着时不抢戏
+- **僵尸自愈看门狗**：hwnd 被整理软件连坐销毁 → 自动重建；应显示却不可见/飞出屏幕 → 自动拉回
+- **托盘**：左键显隐，右键菜单（设置/刷新/退出），任务栏与 Alt+Tab 不占位
+- **设置页独立亚克力窗**：透明度/背景深浅/强调色 5 色/点击打开（详情/播放/搜索）/刷新间隔/鼠标穿透/锁定/悬停/贴边/开播提醒，全部即调即生效
+- 深色主题强制根元素（Application.RequestedTheme 在 WinUI3 靠不住）
+
+**依赖**：Win10 19041+，需装 WinAppRuntime 2.2（非自包含）。设置持久化 `%AppData%\AnimeFollowingWidget\settings.json`。
+
+下载：[Releases](https://github.com/Tebio/Anime-following-widget/releases) 中 `v4.0.x-preview` 的 `AnimeWidget-winui-x64.zip`。
+
+## v3.x — C# WPF 主力稳定线
+
+.NET 8 + WPF 单文件 exe：亚克力圆角暗色卡片、周几 pill tabs、WorkerW 壁纸层/置底双模式、
+系统代理自动检测、双镜像 failover、离线缓存、托盘全功能 + 开机自启、设置窗实时生效、
+悬停隐身（Opacity 动画）、贴边隐藏、整理软件冲突自愈看门狗。
 
 Release 双产物：自包含 ~65MB（免运行时）/ framework-dependent ~0.5MB（需 .NET 8 运行时）。
 
-## 功能
+## 功能（共通）
 
-- **周一~周日放送列表**：直接抓取 [AGE 动漫](https://www.agedm.io/) 首页「本周放送列表」，显示每部番的放送时间、最新集数、New! / 完结 标记，自动选中今天
-- **点击番名跳转搜索**：点「凡人修仙传」→ 浏览器打开 `https://www.agedm.io/search?query=凡人修仙传`
-- **真·桌面挂件**：窗口嵌入桌面壁纸层（WorkerW），打开其他窗口会被盖住，Win+D 仍可见，不占任务栏 / Alt-Tab
-- **可拖拽 + 边缘磁吸**：拖到屏幕边缘自动吸附（8px 边距），位置记忆
-- **鼠标穿透**：开启后点击穿过卡片直达桌面；配合系统托盘图标控制
-- **桌面锁定**：锁定位置禁止拖拽
-- **外观可调**：整体透明度、背景深浅、5 种强调色（青绿/香槟金/雾紫/樱粉/暖橙）
-- **自动刷新**：默认 30 分钟抓一次周表，离线时显示上次缓存
-- **单文件**：静态链接，无需 .NET / 运行时，中文字体运行时读系统字体（雅黑），EXE 不内嵌字体
+- **周一~周日放送列表**：每部番的放送时间、最新集数、New! / 完结 标记，自动选中今天
+- **点击番名跳转**：详情页 / 最新集播放页 / 搜索页（设置里三选一）
+- **收藏星**：行内空心/实心星切换，可只看收藏
+- **自动刷新**：默认 30 分钟，离线显示上次缓存
+- **数据源**：api.agedm.io/v2（官方 App API）优先，SSR HTML 解析兜底
 
 ## 操作方式
 
 | 操作 | 效果 |
 |------|------|
-| 左键拖空白处 / 番名 | 移动卡片（松手自动磁吸边缘） |
-| 左键点番名 | 浏览器打开 AGE 搜索页 |
-| 右键卡片 | 快捷菜单（锁定 / 穿透 / 刷新 / 退出） |
-| ⚙ / 托盘双击 | 设置面板 |
-| 托盘右键 | 锁定位置 / 鼠标穿透 / 设置 / 刷新 / 退出 |
-
-设置持久化在 `%AppData%\AnimeFollowingWidget\settings.json`。
-
-## 下载
-
-1. [Actions → build-rust-windows](https://github.com/Tebio/Anime-following-widget/actions/workflows/build-rust-windows.yml) 下载 Artifact `AnimeWidget-rust-win-x64`
-2. 或 [Releases](https://github.com/Tebio/Anime-following-widget/releases) 中的 `AnimeWidget-win-x64.exe`
-
-发版：Actions → **build-rust-windows** → Run workflow → 勾选 `create_release`，tag 如 `v2.0.0`。
-
-## 本地编译（Rust）
-
-需安装 [Rust](https://rustup.rs/)：
-
-```powershell
-cd anime-widget-rs
-cargo build --release
-# 产物：target\release\anime-widget.exe
-```
-
-测试（含真实 agedm 页面解析回归）：
-
-```powershell
-cargo test
-```
-
-## 技术要点
-
-- eframe/egui 无边框透明窗口
-- Win32：`SetParent` 挂到 WorkerW 壁纸层；`WS_EX_TRANSPARENT` 穿透；`SetLayeredWindowAttributes` 透明度
-- 周表解析：scraper 解析 agedm 首页 SSR HTML（`#week-N-pane` 七个分页），无需 API
-- TLS：Windows 走系统 Schannel，无 openssl/ring，单文件干净
+| 拖空白处 / 标题文字 | 移动卡片（松手磁吸边缘） |
+| 拖四边/四角 8px | 缩放卡片（v4） |
+| 左键点番名 | 浏览器打开详情/播放/搜索页 |
+| 左键星标 | 收藏/取消收藏 |
+| ⚙ / 托盘右键→设置 | 设置面板 |
+| 托盘左键 | 显示/隐藏 |
 
 ## 目录
 
 | 路径 | 说明 |
 |------|------|
-| `anime-widget-rs/` | **Rust 主程序** |
-| `anime-widget-rs/tests/fixtures/agedm_home.html` | 真实 agedm 首页样本（解析回归测试） |
-| `AnimeWidgetDesktop/` | 旧 C# WinForms 版（存档） |
+| `winui-app/` | **v4 WinUI 3 预览线**（partial class 拆分：Behaviors/Tray/Watchdog/Interop） |
+| `csharp-app/` | **v3 WPF 主力线** |
+| `anime-widget-rs/` | v2 Rust（存档） |
+| `AnimeWidgetDesktop/` | v1 WinForms（存档） |
 
 ## 版本
 
-**2.2.0** — 修复两大实机 bug + UI 现代化：自动应用 Windows 系统代理（ureq 不走系统代理导致国内直连被 DNS 污染）、桌面嵌入改为可切换双模式（壁纸层/置底窗口，解决部分系统点击不命中）、错误横幅带逐镜像原因、设置面板加数据诊断。
-**2.1.0** — 数据源加固：双镜像 failover（agedm.io ↔ age.tv）、点击默认直达详情页（可切回搜索页）、标题栏显示数据源。
-**2.0.0** — Rust 完全重写：agedm 直连周表、桌面壁纸层嵌入、鼠标穿透、边缘磁吸、托盘菜单、设置面板。
-**1.x** — 初版（JSON 数据源方案，已废弃）。
+**4.0.x-preview** — WinUI 3 重写线：EnableMsixTooling 修复（缺 .pri 全窗 XamlParseException 六连打不开）、三档材质、原生拖拽/缩放区域、悬停 alpha + 酷呆门控、看门狗自愈、架构收编（partial 拆分）。
+**3.x** — WPF 主力线：AGEDM API 直连、播放页直达、隐身/贴边/看门狗全套。
+**2.x** — Rust 重写（已存档）。
+**1.x** — WinForms 初版（已废弃）。
