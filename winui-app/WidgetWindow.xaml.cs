@@ -158,6 +158,7 @@ public partial class WidgetWindow : Window
         AccentDot.Fill = accent;
         UpdateTabStyles();
         ApplyClickThrough(_settings.ClickThrough);
+        _hoverAlpha = 255; // 材质/透明度切换后复位悬停 alpha 状态机
         UpdateInputRegions(); // 锁定位置切换时同步拖拽区
         _sched.SetInterval(_settings.RefreshMinutes);
     }

@@ -33,16 +33,15 @@ public partial class WidgetWindow
 
     public void ToggleVisibility()
     {
-        if (_hoverHidden) // 悬停隐藏态（窗口在屏幕外）：Show + 移回来
-        {
-            _hoverHidden = false;
-            _visible = true;
-            AppWindow.Show();
-            if (_hoverSavedValid) AppWindow.Move(_hoverSavedPos);
-            return;
-        }
         _visible = !_visible;
-        if (_visible) AppWindow.Show(); else AppWindow.Hide();
+        if (_visible)
+        {
+            // 悬停 alpha 复位（3.16.1 语义：窗口从不移动，托盘只管 Show/Hide）
+            _hoverAlpha = 255;
+            _hoverHidden = false;
+            AppWindow.Show();
+        }
+        else AppWindow.Hide();
     }
 
     private void Tray_Toggle(object sender, RoutedEventArgs e) => ToggleVisibility();

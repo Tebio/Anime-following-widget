@@ -138,8 +138,7 @@ public partial class WidgetWindow
     private bool _edgeHidden;
     private PointInt32 _preHidePos;
     private bool _preHideValid;
-    private PointInt32 _hoverSavedPos;
-    private bool _hoverSavedValid;
+    private byte _hoverAlpha = 255;
 
     private void PollCursor()
     {
@@ -147,39 +146,30 @@ public partial class WidgetWindow
         {
             GetCursorPos(out var cur);
             var pos = AppWindow.Position; var size = AppWindow.Size;
-            // 悬停隐藏态时窗口在屏幕外，inside 判定要用"藏起来的位置"
-            var testPos = _hoverHidden && _hoverSavedValid ? _hoverSavedPos : pos;
-            bool inside = cur.X >= testPos.X && cur.X <= testPos.X + size.Width
-                       && cur.Y >= testPos.Y && cur.Y <= testPos.Y + size.Height;
+            bool inside = cur.X >= pos.X && cur.X <= pos.X + size.Width
+                       && cur.Y >= pos.Y && cur.Y <= pos.Y + size.Height;
 
-            // 悬停显示：光标离开→移到屏幕外（不用 Hide/Show——Show 后合成器重建会黑一帧）；
-            // 光标探入→移回来。藏/现都是 Move，零闪烁。
-            // 仅当托盘未隐藏（_visible）时生效：托盘隐藏期间悬停状态机不许动，
-            // 否则 Move 不 Show，窗口永远回不来。
+            // 悬停显示（严格复刻 3.16.1 语义）：窗口永不移动、永不 Hide，只调窗口 alpha。
+            // 位置不动 → 光标检测永远对准真实位置 → 从结构上不可能"丢"。
+            // 托盘隐藏期间（!_visible）悬停不插手。
             if (_settings.HoverReveal && _visible)
             {
-                if (inside && _hoverHidden)
+                SetExStyle(WS_EX_LAYERED, true);
+                byte target = inside ? CurrentNormalAlpha() : (byte)0;
+                if (target != _hoverAlpha)
                 {
-                    _hoverHidden = false;
-                    AppWindow.Show();
-                    if (_hoverSavedValid) AppWindow.Move(_hoverSavedPos);
-                    BootLog.Log("hover: reveal");
-                }
-                else if (!inside && !_hoverHidden)
-                {
-                    var wa0 = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
-                    _hoverHidden = true;
-                    _hoverSavedPos = pos; _hoverSavedValid = true;
-                    AppWindow.Move(new PointInt32(wa0.X - size.Width - 200, pos.Y));
-                    BootLog.Log("hover: hide offscreen");
+                    SetLayeredWindowAttributes(_hwnd, 0, target, LWA_ALPHA);
+                    _hoverAlpha = target;
+                    _hoverHidden = target == 0;
+                    BootLog.Log(target == 0 ? "hover: fade out" : "hover: fade in");
                 }
             }
-            else if (_hoverHidden)
+            else if (_hoverAlpha != CurrentNormalAlpha())
             {
+                // 开关关掉/托盘操作后：恢复正常透明度
+                SetLayeredWindowAttributes(_hwnd, 0, CurrentNormalAlpha(), LWA_ALPHA);
+                _hoverAlpha = CurrentNormalAlpha();
                 _hoverHidden = false;
-                AppWindow.Show();
-                if (_hoverSavedValid) AppWindow.Move(_hoverSavedPos);
-                BootLog.Log("hover: reveal (toggle off / tray)");
             }
 
             // 贴边隐藏：贴着屏幕边且光标远离 → 缩成 6px 细条；光标靠近 → 滑回
