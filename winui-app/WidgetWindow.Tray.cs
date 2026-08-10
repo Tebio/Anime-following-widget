@@ -33,7 +33,13 @@ public partial class WidgetWindow
 
     public void ToggleVisibility()
     {
-        _hoverHidden = false; // 托盘/按钮显隐优先于悬停状态机，避免互相打架
+        if (_hoverHidden) // 悬停隐藏态（窗口在屏幕外）：先移回来，不做显隐切换
+        {
+            _hoverHidden = false;
+            if (_hoverSavedValid) AppWindow.Move(_hoverSavedPos);
+            _visible = true;
+            return;
+        }
         _visible = !_visible;
         if (_visible) AppWindow.Show(); else AppWindow.Hide();
     }

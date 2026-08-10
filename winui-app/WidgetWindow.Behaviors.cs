@@ -86,7 +86,7 @@ public partial class WidgetWindow
 
     private void SnapTick()
     {
-        if (_edgeHidden) return;
+        if (_edgeHidden || _hoverHidden) return; // 隐藏态的位置是"故意的"，磁吸/回弹别插手
         try
         {
             var pos = AppWindow.Position;
@@ -102,12 +102,12 @@ public partial class WidgetWindow
             var wa = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
             var size = AppWindow.Size;
             const int snap = 16;
+            const int bounceMargin = 40; // 超出屏幕边 40px 就回弹（原"超出一半"太钝，用户无感）
             int nx = pos.X, ny = pos.Y;
 
-            // 出屏回弹：超过一半在可视区外 → 拉回
-            int visibleW = Math.Min(pos.X + size.Width, wa.X + wa.Width) - Math.Max(pos.X, wa.X);
-            int visibleH = Math.Min(pos.Y + size.Height, wa.Y + wa.Height) - Math.Max(pos.Y, wa.Y);
-            if (visibleW < size.Width / 2 || visibleH < size.Height / 2)
+            // 出屏回弹：任一边超出工作区 40px → 完整拉回屏内
+            if (pos.X < wa.X - bounceMargin || pos.X + size.Width > wa.X + wa.Width + bounceMargin
+                || pos.Y < wa.Y - bounceMargin || pos.Y + size.Height > wa.Y + wa.Height + bounceMargin)
             {
                 nx = Math.Clamp(pos.X, wa.X, wa.X + wa.Width - size.Width);
                 ny = Math.Clamp(pos.Y, wa.Y, wa.Y + wa.Height - size.Height);
@@ -138,6 +138,8 @@ public partial class WidgetWindow
     private bool _edgeHidden;
     private PointInt32 _preHidePos;
     private bool _preHideValid;
+    private PointInt32 _hoverSavedPos;
+    private bool _hoverSavedValid;
 
     private void PollCursor()
     {
@@ -145,37 +147,36 @@ public partial class WidgetWindow
         {
             GetCursorPos(out var cur);
             var pos = AppWindow.Position; var size = AppWindow.Size;
-            bool inside = cur.X >= pos.X && cur.X <= pos.X + size.Width
-                       && cur.Y >= pos.Y && cur.Y <= pos.Y + size.Height;
+            // 悬停隐藏态时窗口在屏幕外，inside 判定要用"藏起来的位置"
+            var testPos = _hoverHidden && _hoverSavedValid ? _hoverSavedPos : pos;
+            bool inside = cur.X >= testPos.X && cur.X <= testPos.X + size.Width
+                       && cur.Y >= testPos.Y && cur.Y <= testPos.Y + size.Height;
 
-            // 悬停显示：平时 Hide，光标进入区域浮现（3.16.1 同款语义：被遮挡也浮现）。
-            // 用 AppWindow.Hide/Show 不用分层 alpha（alpha+DComp 在 Win10 上有概率整个窗消失）。
-            // 设置窗开着时强制可见（3.16.1 行为：一边调设置一边看效果，别在眼皮底下消失）。
+            // 悬停显示：光标离开→移到屏幕外（不用 Hide/Show——Show 后合成器重建会黑一帧）；
+            // 光标探入→移回来。藏/现都是 Move，零闪烁。
             if (_settings.HoverReveal)
             {
-                bool settingsOpen = _settingsWin != null;
-                if ((inside || settingsOpen) && _hoverHidden)
+                if (inside && _hoverHidden)
                 {
                     _hoverHidden = false;
-                    _visible = true;
-                    AppWindow.Show();
+                    if (_hoverSavedValid) AppWindow.Move(_hoverSavedPos);
                 }
-                else if (!inside && !settingsOpen && !_hoverHidden)
+                else if (!inside && !_hoverHidden)
                 {
+                    var wa0 = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
                     _hoverHidden = true;
-                    _visible = false;
-                    AppWindow.Hide();
+                    _hoverSavedPos = pos; _hoverSavedValid = true;
+                    AppWindow.Move(new PointInt32(wa0.X - size.Width - 200, pos.Y));
                 }
             }
             else if (_hoverHidden)
             {
                 _hoverHidden = false;
-                _visible = true;
-                AppWindow.Show();
+                if (_hoverSavedValid) AppWindow.Move(_hoverSavedPos);
             }
 
             // 贴边隐藏：贴着屏幕边且光标远离 → 缩成 6px 细条；光标靠近 → 滑回
-            if (_settings.EdgeHide && !_settings.Locked)
+            if (_settings.EdgeHide && !_settings.Locked && !_hoverHidden)
             {
                 var wa = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
                 bool atRight = pos.X + size.Width >= wa.X + wa.Width - 2;
@@ -187,7 +188,11 @@ public partial class WidgetWindow
                 if (!_edgeHidden && (atRight || atLeft || atTop) && !near)
                 {
                     _edgeHidden = true;
-                    _preHidePos = pos; _preHideValid = true;
+                    // 记录的位置先钳回屏内（窗口半边在屏外时直接记原值，恢复后"显示不全"）
+                    _preHidePos = new PointInt32(
+                        Math.Clamp(pos.X, wa.X, wa.X + wa.Width - size.Width),
+                        Math.Clamp(pos.Y, wa.Y, wa.Y + wa.Height - size.Height));
+                    _preHideValid = true;
                     const int strip = 6;
                     if (atRight) AppWindow.Move(new PointInt32(wa.X + wa.Width - strip, pos.Y));
                     else if (atLeft) AppWindow.Move(new PointInt32(wa.X + strip - size.Width, pos.Y));
