@@ -114,14 +114,7 @@ public partial class WidgetWindow : Window
         _sched.Start(_settings.RefreshMinutes);
 
         ApplySettings();
-        TrayIcon.LeftClickCommand = new CommunityToolkit.Mvvm.Input.RelayCommand(ToggleVisibility);
-        try
-        {
-            var ico = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico");
-            if (System.IO.File.Exists(ico)) TrayIcon.Icon = new System.Drawing.Icon(ico);
-        }
-        catch (Exception ex) { BootLog.Log("TrayIcon fail: " + ex.Message); }
-        TrayIcon.ForceCreate();
+        SetupTray(); // 菜单+图标+左键命令全部在代码里构建（DeskBox 方式）
         Closed += (_, _) => _sched.Dispose();
         _current = this;
         StartWatchdog();

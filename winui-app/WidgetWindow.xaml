@@ -14,18 +14,8 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- 系统托盘（图标在代码里用 System.Drawing.Icon 喂，ms-appx URI 在非打包应用下解析不了） -->
-        <tb:TaskbarIcon x:Name="TrayIcon" ToolTipText="追番周表" x:FieldModifier="public">
-            <tb:TaskbarIcon.ContextFlyout>
-                <MenuFlyout>
-                    <MenuFlyoutItem Text="显示 / 隐藏" Click="Tray_Toggle"/>
-                    <MenuFlyoutItem Text="立即刷新" Click="Refresh_Click"/>
-                    <MenuFlyoutItem Text="设置" Click="Settings_Click"/>
-                    <MenuFlyoutSeparator/>
-                    <MenuFlyoutItem Text="退出" Click="Tray_Exit"/>
-                </MenuFlyout>
-            </tb:TaskbarIcon.ContextFlyout>
-        </tb:TaskbarIcon>
+        <!-- 系统托盘（菜单在代码里构建——DeskBox 方式，XAML 声明的 flyout 项在窗口透明态下 Click 不触发） -->
+        <tb:TaskbarIcon x:Name="TrayIcon" ToolTipText="追番周表" x:FieldModifier="public"/>
 
         <!-- 头部 -->
         <Grid x:Name="DragArea" Margin="14,10,8,0">
