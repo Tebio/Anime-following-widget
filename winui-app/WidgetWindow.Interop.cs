@@ -72,6 +72,9 @@ public partial class WidgetWindow
     private static extern IntPtr WindowFromPoint(POINT pt);
 
     [DllImport("user32.dll")]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
+
+    [DllImport("user32.dll")]
     private static extern IntPtr GetAncestor(IntPtr hwnd, uint gaFlags);
 
     [DllImport("user32.dll")]

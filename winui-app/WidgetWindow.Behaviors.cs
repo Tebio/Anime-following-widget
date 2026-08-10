@@ -149,13 +149,13 @@ public partial class WidgetWindow
             bool inside = cur.X >= pos.X && cur.X <= pos.X + size.Width
                        && cur.Y >= pos.Y && cur.Y <= pos.Y + size.Height;
 
-            // 悬停显示（严格复刻 3.16.1 语义）：窗口永不移动、永不 Hide，只调窗口 alpha。
-            // 位置不动 → 光标检测永远对准真实位置 → 从结构上不可能"丢"。
-            // 托盘隐藏期间（!_visible）悬停不插手。
+            // 悬停显示（3.16.1 语义 + 酷呆门控）：窗口永不移动只调 alpha；
+            // 且仅当光标正下方是"桌面层"（我们自己的窗口/shell 桌面/酷呆等整理软件浮层）
+            // 才浮现——压在别的应用窗口上移动鼠标不抢戏。
             if (_settings.HoverReveal && _visible)
             {
                 SetExStyle(WS_EX_LAYERED, true);
-                byte target = inside ? CurrentNormalAlpha() : (byte)0;
+                byte target = inside && CursorOverDesktop(cur) ? CurrentNormalAlpha() : (byte)0;
                 if (target != _hoverAlpha)
                 {
                     SetLayeredWindowAttributes(_hwnd, 0, target, LWA_ALPHA);
@@ -222,5 +222,24 @@ public partial class WidgetWindow
         _ = GetClassNameW(hwnd, sb, sb.Capacity);
         var cls = sb.ToString();
         return cls is "Progman" or "WorkerW" or "SHELLDLL_DefView";
+    }
+
+    // 桌面整理软件浮层（酷呆=Coodesker、iTop 等）也算"桌面层"——它们的浮窗不是 shell 类名，
+    // 纯类名白名单会误判。按进程名识别。
+    private static readonly string[] DesktopLayerProcs =
+        { "explorer", "coodesker", "kudai", "itop", "fences", "stardock" };
+
+    private bool CursorOverDesktop(POINT cur)
+    {
+        var root = GetAncestor(WindowFromPoint(cur), GA_ROOT);
+        if (root == _hwnd) return true;                    // 悬在本体上
+        if (IsShellWindow(root)) return true;              // 系统桌面
+        try
+        {
+            GetWindowThreadProcessId(root, out uint pid);
+            var name = System.Diagnostics.Process.GetProcessById((int)pid).ProcessName.ToLowerInvariant();
+            return DesktopLayerProcs.Any(p => name.Contains(p));
+        }
+        catch { return false; }                            // 别的应用窗口 → 不浮现
     }
 }
