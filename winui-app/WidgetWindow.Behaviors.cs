@@ -154,12 +154,16 @@ public partial class WidgetWindow
 
             // 悬停显示：光标离开→移到屏幕外（不用 Hide/Show——Show 后合成器重建会黑一帧）；
             // 光标探入→移回来。藏/现都是 Move，零闪烁。
-            if (_settings.HoverReveal)
+            // 仅当托盘未隐藏（_visible）时生效：托盘隐藏期间悬停状态机不许动，
+            // 否则 Move 不 Show，窗口永远回不来。
+            if (_settings.HoverReveal && _visible)
             {
                 if (inside && _hoverHidden)
                 {
                     _hoverHidden = false;
+                    AppWindow.Show();
                     if (_hoverSavedValid) AppWindow.Move(_hoverSavedPos);
+                    BootLog.Log("hover: reveal");
                 }
                 else if (!inside && !_hoverHidden)
                 {
@@ -167,12 +171,15 @@ public partial class WidgetWindow
                     _hoverHidden = true;
                     _hoverSavedPos = pos; _hoverSavedValid = true;
                     AppWindow.Move(new PointInt32(wa0.X - size.Width - 200, pos.Y));
+                    BootLog.Log("hover: hide offscreen");
                 }
             }
             else if (_hoverHidden)
             {
                 _hoverHidden = false;
+                AppWindow.Show();
                 if (_hoverSavedValid) AppWindow.Move(_hoverSavedPos);
+                BootLog.Log("hover: reveal (toggle off / tray)");
             }
 
             // 贴边隐藏：贴着屏幕边且光标远离 → 缩成 6px 细条；光标靠近 → 滑回

@@ -45,6 +45,23 @@ public partial class WidgetWindow
                 BootLog.Log("看门狗：窗口应显示但不可见，拉回");
                 try { cur.AppWindow.Show(); } catch { }
             }
+            // 位置兜底：应显示却完全落在所有屏幕之外 → 拉回默认位（防"哪都找不到"）
+            if (cur._visible && !cur._hoverHidden && !cur._edgeHidden)
+            {
+                try
+                {
+                    var pos = cur.AppWindow.Position; var size = cur.AppWindow.Size;
+                    var wa = DisplayArea.GetFromWindowId(cur.AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
+                    bool outsideAll = pos.X + size.Width < wa.X || pos.X > wa.X + wa.Width
+                                   || pos.Y + size.Height < wa.Y || pos.Y > wa.Y + wa.Height;
+                    if (outsideAll)
+                    {
+                        BootLog.Log("看门狗：窗口完全在屏幕外，拉回默认位");
+                        cur.AppWindow.Move(new PointInt32(wa.X + wa.Width - size.Width - 24, wa.Y + 80));
+                    }
+                }
+                catch { }
+            }
         };
         _dog.Start();
     }
