@@ -24,6 +24,9 @@ public partial class WidgetWindow
             _settingsWin = new SettingsWindow(_settings, this);
             _settingsWin.Closed += (_, _) => _settingsWin = null;
             _settingsWin.Activate();
+            // 顶到前台（无任务栏占位的应用 Activate 可能不前置，强制 SetForeground）
+            var sw = Win32Interop.GetWindowFromWindowId(_settingsWin.AppWindow.Id);
+            SetForegroundWindow(sw);
             BootLog.Log("Settings opened");
         }
         catch (Exception ex) { BootLog.Log("Settings FAIL: " + ex); }
@@ -36,9 +39,13 @@ public partial class WidgetWindow
         _visible = !_visible;
         if (_visible)
         {
-            // 悬停 alpha 复位（3.16.1 语义：窗口从不移动，托盘只管 Show/Hide）
-            _hoverAlpha = 255;
+            // 立即复位透明度（不能只改字段——否则悬停状态机下一帧又淡回去，
+            // 用户看到的就是"点了没反应"）；并给 3 秒强制可见宽限
+            _hoverAlpha = CurrentNormalAlpha();
             _hoverHidden = false;
+            _forceVisibleUntil = DateTime.UtcNow.AddSeconds(3);
+            SetExStyle(WS_EX_LAYERED, true);
+            SetLayeredWindowAttributes(_hwnd, 0, CurrentNormalAlpha(), LWA_ALPHA);
             AppWindow.Show();
         }
         else AppWindow.Hide();

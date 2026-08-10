@@ -75,6 +75,9 @@ public partial class WidgetWindow
     private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);
 
     [DllImport("user32.dll")]
+    private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
     private static extern IntPtr GetAncestor(IntPtr hwnd, uint gaFlags);
 
     [DllImport("user32.dll")]

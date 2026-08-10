@@ -139,6 +139,7 @@ public partial class WidgetWindow
     private PointInt32 _preHidePos;
     private bool _preHideValid;
     private byte _hoverAlpha = 255;
+    private DateTime _forceVisibleUntil = DateTime.MinValue; // 托盘"显示"后的宽限期：悬停暂不淡出
 
     private void PollCursor()
     {
@@ -155,7 +156,8 @@ public partial class WidgetWindow
             if (_settings.HoverReveal && _visible)
             {
                 SetExStyle(WS_EX_LAYERED, true);
-                byte target = inside && CursorOverDesktop(cur) ? CurrentNormalAlpha() : (byte)0;
+                bool grace = DateTime.UtcNow < _forceVisibleUntil;
+                byte target = (inside && CursorOverDesktop(cur)) || grace ? CurrentNormalAlpha() : (byte)0;
                 if (target != _hoverAlpha)
                 {
                     SetLayeredWindowAttributes(_hwnd, 0, target, LWA_ALPHA);

@@ -248,7 +248,11 @@ public partial class WidgetWindow : Window
         UpdateStatus();
     }
 
-    private void Refresh_Click(object sender, RoutedEventArgs e) => _sched.RefreshNow();
+    private void Refresh_Click(object sender, RoutedEventArgs e)
+    {
+        StatusText.Text = "刷新中…";
+        _sched.RefreshNow();
+    }
 
     private void Star_Click(object sender, RoutedEventArgs e)
     {
