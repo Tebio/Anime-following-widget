@@ -32,6 +32,19 @@ public partial class WidgetWindow
         menu.Items.Add(Item("立即刷新", "refresh", () => { StatusText.Text = "刷新中…"; _sched.RefreshNow(); }));
         menu.Items.Add(Item("设置", "settings", () => Settings_Click(null!, null!)));
         menu.Items.Add(new MenuFlyoutSeparator());
+
+        // 开机自启（移植 3.16.1：HKCU Run 键）
+        var autoItem = new ToggleMenuFlyoutItem { Text = "开机自启", IsChecked = GetAutostart() };
+        var autoCmd = new Microsoft.UI.Xaml.Input.XamlUICommand();
+        autoCmd.ExecuteRequested += (_, _) =>
+        {
+            SetAutostart(!GetAutostart());
+            autoItem.IsChecked = GetAutostart();
+            BootLog.Log("autostart: " + GetAutostart());
+        };
+        autoItem.Command = autoCmd;
+        menu.Items.Add(autoItem);
+
         menu.Items.Add(Item("退出", "exit", () => Tray_Exit(null!, null!)));
 
         TrayIcon.ContextFlyout = menu;
@@ -43,6 +56,32 @@ public partial class WidgetWindow
         }
         catch { }
         TrayIcon.ForceCreate();
+    }
+
+    // ---------- 开机自启（3.16.1 同款：HKCU Run 键） ----------
+
+    private const string RunKeyPath = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    private const string RunValueName = "AnimeFollowingWidget";
+
+    private static bool GetAutostart()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(RunKeyPath);
+            return key?.GetValue(RunValueName) is string;
+        }
+        catch { return false; }
+    }
+
+    private static void SetAutostart(bool on)
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(RunKeyPath);
+            if (on) key.SetValue(RunValueName, $"\"{Environment.ProcessPath}\"");
+            else key.DeleteValue(RunValueName, false);
+        }
+        catch (Exception ex) { BootLog.Log("autostart fail: " + ex.Message); }
     }
 
     private void Settings_Click(object sender, RoutedEventArgs e)
