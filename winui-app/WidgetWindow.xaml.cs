@@ -66,7 +66,7 @@ public partial class WidgetWindow : Window
         // 任务栏不显示（托盘已够）：WS_EX_TOOLWINDOW；Alt+Tab 也藏掉
         AppWindow.IsShownInSwitchers = false;
         SetExStyle(WS_EX_TOOLWINDOW, true);
-        AppWindow.Resize(new SizeInt32(360, 540));
+        RestoreGeometry(); // 还原上次位置/尺寸（无记录则落默认右上；3.16.1 Persist 同款思路）
 
         // ---- 原生级拖拽+八向缩放：NonClientPointerSource 区域（无标题栏窗口的正解） ----
         _ncpSource = Microsoft.UI.Input.InputNonClientPointerSource.GetForWindowId(AppWindow.Id);
@@ -80,13 +80,6 @@ public partial class WidgetWindow : Window
         _pollTimer.Interval = TimeSpan.FromMilliseconds(150);
         _pollTimer.Tick += (_, _) => { PollCursor(); SnapTick(); };
         _pollTimer.Start();
-        try
-        {
-            var area = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary);
-            var wa = area.WorkArea;
-            AppWindow.Move(new PointInt32(wa.X + wa.Width - 360 - 24, wa.Y + 80));
-        }
-        catch { }
 
         EntryList.ItemsSource = _rows;
         BootLog.Log("ctor done");
@@ -115,7 +108,7 @@ public partial class WidgetWindow : Window
 
         ApplySettings();
         SetupTray(); // 菜单+图标+左键命令全部在代码里构建（DeskBox 方式）
-        Closed += (_, _) => _sched.Dispose();
+        Closed += (_, _) => { PersistGeometry(); _sched.Dispose(); };
         _current = this;
         StartWatchdog();
     }

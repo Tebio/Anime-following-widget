@@ -82,17 +82,20 @@ public partial class WidgetWindow
 
     private bool _snapping;
     private PointInt32 _lastPos = new(-1, -1);
+    private SizeInt32 _lastSize = new(-1, -1);
     private DateTime _lastMoveAt = DateTime.MinValue;
 
     private void SnapTick()
     {
-        if (_edgeHidden || _hoverHidden) return; // 隐藏态的位置是"故意的"，磁吸/回弹别插手
+        if (_edgeHidden || _hoverHidden) return; // 隐藏态的位置是"故意的"，磁吸/回弹/持久化都别插手
         try
         {
             var pos = AppWindow.Position;
-            if (pos.X != _lastPos.X || pos.Y != _lastPos.Y)
+            var size = AppWindow.Size;
+            if (pos.X != _lastPos.X || pos.Y != _lastPos.Y || size.Width != _lastSize.Width || size.Height != _lastSize.Height)
             {
                 _lastPos = pos;
+                _lastSize = size;
                 _lastMoveAt = DateTime.UtcNow;
                 return; // 还在动
             }
@@ -100,7 +103,6 @@ public partial class WidgetWindow
                 return;
 
             var wa = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
-            var size = AppWindow.Size;
             const int snap = 16;
             const int bounceMargin = 40; // 超出屏幕边 40px 就回弹（原"超出一半"太钝，用户无感）
             int nx = pos.X, ny = pos.Y;
@@ -127,6 +129,62 @@ public partial class WidgetWindow
                 _lastPos = new PointInt32(nx, ny);
                 _snapping = false;
             }
+            PersistGeometry(); // 停稳 400ms 后落盘；用户拖完/缩完立刻杀进程也只丢最后一帧
+        }
+        catch { }
+    }
+
+    // ---------- 位置/尺寸持久化（移植 3.16.1 Persist/EnsureOnScreen 思路） ----------
+
+    private const int MinWinW = 280;
+    private const int MinWinH = 360;
+
+    private void RestoreGeometry()
+    {
+        try
+        {
+            var wa = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
+            int w = _settings.Width.HasValue ? (int)Math.Round(_settings.Width.Value) : 360;
+            int h = _settings.Height.HasValue ? (int)Math.Round(_settings.Height.Value) : 540;
+            w = Math.Clamp(w, MinWinW, Math.Max(MinWinW, wa.Width));
+            h = Math.Clamp(h, MinWinH, Math.Max(MinWinH, wa.Height));
+            AppWindow.Resize(new SizeInt32(w, h));
+
+            int x = _settings.Left.HasValue ? (int)Math.Round(_settings.Left.Value) : wa.X + wa.Width - w - 24;
+            int y = _settings.Top.HasValue ? (int)Math.Round(_settings.Top.Value) : wa.Y + 80;
+            // 钳回当前工作区：拔副屏/改分辨率后不能还原到屏外（EnsureOnScreen 同款兜底）
+            int maxX = Math.Max(wa.X, wa.X + wa.Width - w);
+            int maxY = Math.Max(wa.Y, wa.Y + wa.Height - h);
+            x = Math.Clamp(x, wa.X, maxX);
+            y = Math.Clamp(y, wa.Y, maxY);
+            AppWindow.Move(new PointInt32(x, y));
+
+            _lastPos = new PointInt32(x, y);
+            _lastSize = new SizeInt32(w, h);
+            _lastMoveAt = DateTime.UtcNow;
+            BootLog.Log($"geometry restore: {x},{y} {w}x{h} fromSettings={_settings.Left.HasValue && _settings.Top.HasValue}");
+        }
+        catch (Exception ex) { BootLog.Log("geometry restore fail: " + ex.Message); }
+    }
+
+    private void PersistGeometry()
+    {
+        if (_edgeHidden || _hoverHidden) return; // 贴边细条/悬停透明是临时态，不写入
+        try
+        {
+            var pos = AppWindow.Position;
+            var size = AppWindow.Size;
+            if (size.Width < MinWinW || size.Height < MinWinH) return;
+            bool changed = !_settings.Left.HasValue || (int)Math.Round(_settings.Left.Value) != pos.X
+                        || !_settings.Top.HasValue || (int)Math.Round(_settings.Top.Value) != pos.Y
+                        || !_settings.Width.HasValue || (int)Math.Round(_settings.Width.Value) != size.Width
+                        || !_settings.Height.HasValue || (int)Math.Round(_settings.Height.Value) != size.Height;
+            if (!changed) return;
+            _settings.Left = pos.X;
+            _settings.Top = pos.Y;
+            _settings.Width = size.Width;
+            _settings.Height = size.Height;
+            _settings.Save();
         }
         catch { }
     }
