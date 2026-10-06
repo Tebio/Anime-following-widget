@@ -6,6 +6,7 @@ on:
     branches: [main]
     paths:
       - "winui-app/**"
+      - "shared/**"
       - ".github/workflows/build-winui.yml"
     tags:
       - "v4.*"

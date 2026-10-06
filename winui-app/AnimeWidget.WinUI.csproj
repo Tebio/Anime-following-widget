@@ -29,6 +29,11 @@
     <Version>$(AW_VERSION)</Version>
   </PropertyGroup>
 
+  <!-- v3 / v4 共用的数据层，见 shared/README.md -->
+  <ItemGroup>
+    <Compile Include="..\shared\*.cs" LinkBase="Shared" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- DeskBox 实证可用配置：WASDK 2.2 + 系统 Windows App Runtime 2.x（用户机器已装） -->
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.2.0" />
