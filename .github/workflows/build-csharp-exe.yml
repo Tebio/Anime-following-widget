@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - "csharp-app/**"
+      - "shared/**"
       - ".github/workflows/build-csharp-exe.yml"
     tags:
       - "v3.*"
