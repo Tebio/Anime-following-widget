@@ -29,6 +29,12 @@ jobs:
         with:
           dotnet-version: "8.0.x"
 
+      - name: Version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        run: |
+          "AW_VERSION=$($env:GITHUB_REF_NAME.TrimStart('v'))" >> $env:GITHUB_ENV
+
       - name: Publish single-file exe (self-contained)
         run: dotnet publish -c Release -r win-x64 --self-contained true
 

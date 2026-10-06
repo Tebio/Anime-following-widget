@@ -7,7 +7,3 @@ obj/
 *.log
 publish/
 artifacts/
-
-# Rust
-anime-widget-rs/target/
-**/Cargo.lock

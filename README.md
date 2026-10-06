@@ -2,13 +2,14 @@
 
 Windows 桌面追番小组件。数据直连 [AGE 动漫](https://www.agedm.io/) 周表（官方 App API 优先 + SSR HTML 兜底）。
 
-## 三条线
+## 两条线
 
 | 线 | 状态 | 路径 |
 |---|---|---|
-| **v4.x WinUI 3** | 预览线（实机可用） | `winui-app/` |
+| **v4.x WinUI 3** | 预览线（实机可用，当前开发焦点） | `winui-app/` |
 | **v3.x C# WPF** | 主力稳定线 | `csharp-app/` |
-| v2 Rust / v1 WinForms | 存档 | `anime-widget-rs/` / `AnimeWidgetDesktop/` |
+
+v2 Rust 与 v1 WinForms 已移出主干，存档在 [`archive/v1-v2`](https://github.com/Tebio/Anime-following-widget/tree/archive/v1-v2) 分支，旧 Release 保留。
 
 ## v4.x — WinUI 3 预览线（当前开发焦点）
 
@@ -59,12 +60,11 @@ Release 双产物：自包含 ~65MB（免运行时）/ framework-dependent ~0.5M
 |------|------|
 | `winui-app/` | **v4 WinUI 3 预览线**（partial class 拆分：Behaviors/Tray/Watchdog/Interop） |
 | `csharp-app/` | **v3 WPF 主力线** |
-| `anime-widget-rs/` | v2 Rust（存档） |
-| `AnimeWidgetDesktop/` | v1 WinForms（存档） |
+| `.github/workflows/` | `build-winui.yml`（tag `v4.*`）/ `build-csharp-exe.yml`（tag `v3.*`） |
 
 ## 版本
 
 **4.0.x-preview** — WinUI 3 重写线：EnableMsixTooling 修复（缺 .pri 全窗 XamlParseException 六连打不开）、三档材质、原生拖拽/缩放区域、悬停 alpha + 酷呆门控、看门狗自愈、架构收编（partial 拆分）。
 **3.x** — WPF 主力线：AGEDM API 直连、播放页直达、隐身/贴边/看门狗全套。
-**2.x** — Rust 重写（已存档）。
-**1.x** — WinForms 初版（已废弃）。
+**2.x** — Rust 重写（已存档，见 `archive/v1-v2` 分支）。
+**1.x** — WinForms 初版（已废弃，同上）。

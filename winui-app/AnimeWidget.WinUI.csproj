@@ -24,6 +24,11 @@
     <EnableMsixTooling>true</EnableMsixTooling>
   </PropertyGroup>
 
+  <!-- CI 打 tag 时通过环境变量 AW_VERSION 注入版本号（如 4.0.28-preview）；本地构建沿用上面的默认值 -->
+  <PropertyGroup Condition="'$(AW_VERSION)' != ''">
+    <Version>$(AW_VERSION)</Version>
+  </PropertyGroup>
+
   <ItemGroup>
     <!-- DeskBox 实证可用配置：WASDK 2.2 + 系统 Windows App Runtime 2.x（用户机器已装） -->
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="2.2.0" />
