@@ -108,46 +108,165 @@ public class AppSettings
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "AnimeFollowingWidget");
     public static string SettingsPath => Path.Combine(Dir, "settings.json");
     public static string CachePath => Path.Combine(Dir, "cache.json");
+    /// <summary>上一份成功写入的设置（File.Replace 自动维护）；主文件损坏时从它恢复。</summary>
+    public static string SettingsBakPath => SettingsPath + ".bak";
+    /// <summary>损坏的主文件会被改名保留到这里，供事后排查。</summary>
+    public static string SettingsCorruptPath => SettingsPath + ".corrupt";
+
+    /// <summary>最近一次 Load 的提示（损坏恢复 / 回退默认值），正常为 null。</summary>
+    public static string? LastLoadNotice { get; private set; }
+    /// <summary>最近一次写盘失败的原因，成功后清空。</summary>
+    public static string? LastSaveError { get; private set; }
+
+    // ---------- 持久化实现 ----------
+    // 要点：1) 先写 .tmp 再原子替换，崩溃/断电不会留下半截 JSON；
+    //      2) Load 失败不再静默回退默认值——损坏文件改名留存，并优先用 .bak 恢复；
+    //      3) Save() 合并写盘（节流 300ms，取最新快照），设置页滑杆连拖不再每次都写盘；
+    //         进程正常退出（ProcessExit）与 Load() 前都会 Flush，不丢最后一次修改。
+
+    private static readonly object _io = new();
+    private static readonly JsonSerializerOptions _json = new() { WriteIndented = true };
+    private const int SaveDelayMs = 300;
+    private static string? _pendingJson;
+    private static bool _armed;
+    private static bool _exitHooked;
+    private static System.Threading.Timer? _timer;
+
+    private enum ReadState { Missing, Ok, Corrupt }
+
+    private static ReadState ReadJson<T>(string path, out T? value) where T : class
+    {
+        value = null;
+        try
+        {
+            if (!File.Exists(path)) return ReadState.Missing;
+            value = JsonSerializer.Deserialize<T>(File.ReadAllText(path));
+            return value != null ? ReadState.Ok : ReadState.Corrupt;
+        }
+        catch
+        {
+            return ReadState.Corrupt;
+        }
+    }
+
+    /// <summary>先写临时文件再原子替换目标；bakPath 非空时旧版本留作备份。短暂的 IO 占用（杀软/同步盘）重试 3 次。</summary>
+    private static void WriteAtomic(string path, string content, string? bakPath)
+    {
+        Directory.CreateDirectory(Dir);
+        var tmp = path + ".tmp";
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                File.WriteAllText(tmp, content);
+                if (File.Exists(path))
+                {
+                    if (bakPath != null) File.Replace(tmp, path, bakPath);
+                    else File.Move(tmp, path, overwrite: true);
+                }
+                else
+                {
+                    File.Move(tmp, path);
+                    // 主文件不存在说明是首次写入或用户手动删除来重置：旧备份不应再被当作恢复源
+                    if (bakPath != null) { try { File.Delete(bakPath); } catch { } }
+                }
+                return;
+            }
+            catch (IOException) when (attempt < 2)
+            {
+                System.Threading.Thread.Sleep(50);
+            }
+        }
+    }
 
     public static AppSettings Load()
     {
-        try
+        Flush(); // 有未落盘的修改（如看门狗重建窗口）先写下去，避免读到旧文件
+        lock (_io)
         {
-            if (File.Exists(SettingsPath))
-                return JsonSerializer.Deserialize<AppSettings>(File.ReadAllText(SettingsPath)) ?? new();
+            LastLoadNotice = null;
+            var state = ReadJson<AppSettings>(SettingsPath, out var s);
+            if (state == ReadState.Ok) return s!;
+            if (state == ReadState.Missing) return new(); // 首次运行或用户手动删除来重置
+
+            // 主文件存在但读不出来：改名留存，不让下一次 Save 把它盖掉
+            try { File.Move(SettingsPath, SettingsCorruptPath, overwrite: true); } catch { }
+            if (ReadJson<AppSettings>(SettingsBakPath, out var bak) == ReadState.Ok)
+            {
+                LastLoadNotice = "settings.json 已损坏，已从 settings.json.bak 恢复（原文件保留为 settings.json.corrupt）";
+                return bak!;
+            }
+            LastLoadNotice = "settings.json 已损坏且无可用备份，已使用默认设置（原文件保留为 settings.json.corrupt）";
+            return new();
         }
-        catch { }
-        return new();
     }
 
+    /// <summary>保存设置。合并写盘：300ms 内的多次调用只落最后一份快照；需要立刻落盘用 <see cref="Flush"/>。</summary>
     public void Save()
     {
+        string json;
         try
         {
-            Directory.CreateDirectory(Dir);
-            File.WriteAllText(SettingsPath,
-                JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true }));
+            // 在调用线程（UI）上序列化，保证快照一致；定时器线程只负责写盘
+            json = JsonSerializer.Serialize(this, _json);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            LastSaveError = "设置序列化失败: " + ex.Message;
+            return;
+        }
+        lock (_io)
+        {
+            _pendingJson = json;
+            if (!_exitHooked)
+            {
+                _exitHooked = true;
+                AppDomain.CurrentDomain.ProcessExit += (_, _) => Flush();
+            }
+            if (_armed) return;
+            _armed = true;
+            _timer ??= new System.Threading.Timer(_ => Flush(), null,
+                System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+            _timer.Change(SaveDelayMs, System.Threading.Timeout.Infinite);
+        }
+    }
+
+    /// <summary>把待写的最新快照立刻写盘（无待写内容时什么都不做）。</summary>
+    public static void Flush()
+    {
+        lock (_io)
+        {
+            _armed = false;
+            var json = _pendingJson;
+            _pendingJson = null;
+            if (json == null) return;
+            try
+            {
+                WriteAtomic(SettingsPath, json, SettingsBakPath);
+                LastSaveError = null;
+            }
+            catch (Exception ex)
+            {
+                LastSaveError = "保存设置失败: " + ex.Message;
+            }
+        }
     }
 
     public static WeekSchedule? LoadCache()
     {
-        try
+        lock (_io)
         {
-            if (File.Exists(CachePath))
-                return JsonSerializer.Deserialize<WeekSchedule>(File.ReadAllText(CachePath));
+            // 缓存损坏无所谓：返回 null，下一轮抓取会重建
+            return ReadJson<WeekSchedule>(CachePath, out var c) == ReadState.Ok ? c : null;
         }
-        catch { }
-        return null;
     }
 
     public static void SaveCache(WeekSchedule sched)
     {
         try
         {
-            Directory.CreateDirectory(Dir);
-            File.WriteAllText(CachePath, JsonSerializer.Serialize(sched));
+            var json = JsonSerializer.Serialize(sched);
+            lock (_io) WriteAtomic(CachePath, json, null);
         }
         catch { }
     }
