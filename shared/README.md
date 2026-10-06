@@ -10,3 +10,7 @@ v3（`csharp-app/`）与 v4（`winui-app/`）共用的数据层，两个 csproj 
 | `ProxyDetect.cs` | 系统代理检测 |
 
 约束：只能依赖两个项目都有的包（目前是 HtmlAgilityPack），不得引用 WPF / WinUI 类型。
+
+## CI 触发
+
+`build-winui.yml` 与 `build-csharp-exe.yml` 的 `paths` 都含 `shared/**`——只改这里（哪怕一行注释）也会同时重建 v3 与 v4，别只盯着自己那条线。
